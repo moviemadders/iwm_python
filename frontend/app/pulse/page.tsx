@@ -38,6 +38,7 @@ export default function PulsePage() {
   })
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [trendingTopics, setTrendingTopics] = useState(mockTrendingTopics)
 
   // Fetch initial data
   useEffect(() => {
@@ -91,6 +92,29 @@ export default function PulsePage() {
 
     fetchData()
   }, [activeTab])
+
+  // Fetch trending topics from backend
+  useEffect(() => {
+    const fetchTrendingTopics = async () => {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL
+      const useBackend = process.env.NEXT_PUBLIC_ENABLE_BACKEND === 'true' && !!apiBase
+
+      if (!useBackend) return
+
+      try {
+        const response = await fetch(`${apiBase}/api/v1/pulse/trending-topics?window=7d&limit=5`)
+        if (!response.ok) throw new Error('Failed to fetch trending topics')
+        const data = await response.json()
+        if (Array.isArray(data) && data.length > 0) {
+          setTrendingTopics(data)
+        }
+      } catch (error) {
+        console.warn('Failed to fetch trending topics, using mock data:', error)
+      }
+    }
+
+    fetchTrendingTopics()
+  }, [])
 
 
   // Load more posts (infinite scroll)
@@ -155,10 +179,10 @@ export default function PulsePage() {
       prev.map((post) =>
         post.id === postId
           ? {
-              ...post,
-              is_liked: !post.is_liked,
-              like_count: post.is_liked ? post.like_count - 1 : post.like_count + 1,
-            }
+            ...post,
+            is_liked: !post.is_liked,
+            like_count: post.is_liked ? post.like_count - 1 : post.like_count + 1,
+          }
           : post
       )
     )
@@ -196,10 +220,10 @@ export default function PulsePage() {
       prev.map((post) =>
         post.id === postId
           ? {
-              ...post,
-              is_echoed: true,
-              echo_count: post.echo_count + 1,
-            }
+            ...post,
+            is_echoed: true,
+            echo_count: post.echo_count + 1,
+          }
           : post
       )
     )
@@ -211,12 +235,12 @@ export default function PulsePage() {
       prev.map((post) =>
         post.id === postId
           ? {
-              ...post,
-              is_bookmarked: !post.is_bookmarked,
-              bookmark_count: post.is_bookmarked
-                ? post.bookmark_count - 1
-                : post.bookmark_count + 1,
-            }
+            ...post,
+            is_bookmarked: !post.is_bookmarked,
+            bookmark_count: post.is_bookmarked
+              ? post.bookmark_count - 1
+              : post.bookmark_count + 1,
+          }
           : post
       )
     )
@@ -272,7 +296,7 @@ export default function PulsePage() {
       }
       rightSidebar={
         <PulseRightSidebar
-          trendingTopics={mockTrendingTopics}
+          trendingTopics={trendingTopics}
           suggestedUsers={mockSuggestedUsers}
           trendingMovies={mockTrendingMovies}
           trendingCricket={mockTrendingCricket}

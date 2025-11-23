@@ -64,9 +64,21 @@ class SettingsRepository:
         ).scalar_one_or_none()
         if not row:
             return DEFAULTS.copy()
+        
+        # Merge User table data into profile settings
+        profile_data = {**DEFAULTS["profile"], **(row.profile or {})}
+        if user.username:
+            profile_data["username"] = user.username
+        if user.name:
+            profile_data["fullName"] = user.name
+        if user.avatar_url:
+            profile_data["avatarUrl"] = user.avatar_url
+        if user.bio:
+            profile_data["bio"] = user.bio
+
         data = {
             "account": {**DEFAULTS["account"], **(row.account or {})},
-            "profile": {**DEFAULTS["profile"], **(row.profile or {})},
+            "profile": profile_data,
             "privacy": {**DEFAULTS["privacy"], **(row.privacy or {})},
             "display": {**DEFAULTS["display"], **(row.display or {})},
             "preferences": {**DEFAULTS["preferences"], **(row.preferences or {})},
@@ -86,6 +98,20 @@ class SettingsRepository:
                 if k in merged and isinstance(v, dict):
                     merged[k] = {**merged[k], **v}
             return merged
+        
+        # Update User table fields if present in profile payload
+        if "profile" in payload:
+            profile_payload = payload["profile"]
+            if "username" in profile_payload:
+                user.username = profile_payload["username"]
+            if "fullName" in profile_payload:
+                user.name = profile_payload["fullName"]
+            if "avatarUrl" in profile_payload:
+                user.avatar_url = profile_payload["avatarUrl"]
+            if "bio" in profile_payload:
+                user.bio = profile_payload["bio"]
+            self.session.add(user)
+
         row = await self._get_or_create_row(user.id)
         for section in DEFAULTS.keys():
             if section in payload and isinstance(payload[section], dict):
@@ -107,6 +133,19 @@ class SettingsRepository:
         if not user:
             merged = {**DEFAULTS[section], **(data or {})}
             return merged
+            
+        # Update User table fields if updating profile section
+        if section == "profile":
+            if "username" in data:
+                user.username = data["username"]
+            if "fullName" in data:
+                user.name = data["fullName"]
+            if "avatarUrl" in data:
+                user.avatar_url = data["avatarUrl"]
+            if "bio" in data:
+                user.bio = data["bio"]
+            self.session.add(user)
+
         row = await self._get_or_create_row(user.id)
         current = getattr(row, section) or {}
         merged = {**current, **dict(data)}

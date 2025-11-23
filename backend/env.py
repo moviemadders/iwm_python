@@ -24,13 +24,14 @@ from pathlib import Path
 import sys
 
 # Ensure repository root is on sys.path so we can import app modules
-_repo_root = Path(__file__).resolve().parents[3]
-if str(_repo_root) not in sys.path:
-    sys.path.append(str(_repo_root))
+# Ensure repository root is on sys.path so we can import app modules
+# _repo_root = Path(__file__).resolve().parents[3]
+# if str(_repo_root) not in sys.path:
+#     sys.path.append(str(_repo_root))
 
-from apps.backend.src.config import settings  # type: ignore
-from apps.backend.src.db import Base  # type: ignore
-from apps.backend.src import models  # noqa: F401  # ensure models are imported for autogenerate
+from src.config import settings  # type: ignore
+from src.db import Base  # type: ignore
+from src import models  # noqa: F401  # ensure models are imported for autogenerate
 
 target_metadata = Base.metadata
 

@@ -8,6 +8,7 @@ import { z } from "zod"
  * Critic Settings Schema
  */
 export const criticSettingsSchema = z.object({
+  handle: z.string().min(3, "Handle must be at least 3 characters").max(50, "Handle must be less than 50 characters").regex(/^[a-zA-Z0-9_]+$/, "Handle can only contain letters, numbers, and underscores").optional().or(z.literal("")),
   bio: z.string().max(1000, "Bio must be less than 1000 characters").optional().or(z.literal("")),
   expertise: z.array(z.string()).optional(),
   twitter_url: z.string().url("Invalid Twitter URL").optional().or(z.literal("")),
@@ -23,6 +24,7 @@ export type CriticSettingsFormData = z.infer<typeof criticSettingsSchema>
  * Talent Settings Schema
  */
 export const talentSettingsSchema = z.object({
+  handle: z.string().min(3, "Handle must be at least 3 characters").max(50, "Handle must be less than 50 characters").regex(/^[a-zA-Z0-9_]+$/, "Handle can only contain letters, numbers, and underscores").optional().or(z.literal("")),
   stage_name: z.string().max(200, "Stage name must be less than 200 characters").optional().or(z.literal("")),
   bio: z.string().max(1000, "Bio must be less than 1000 characters").optional().or(z.literal("")),
   headshot_url: z.string().url("Invalid headshot URL").optional().or(z.literal("")),
@@ -40,6 +42,7 @@ export type TalentSettingsFormData = z.infer<typeof talentSettingsSchema>
  * Industry Pro Settings Schema
  */
 export const industryProSettingsSchema = z.object({
+  handle: z.string().min(3, "Handle must be at least 3 characters").max(50, "Handle must be less than 50 characters").regex(/^[a-zA-Z0-9_]+$/, "Handle can only contain letters, numbers, and underscores").optional().or(z.literal("")),
   company_name: z.string().max(200, "Company name must be less than 200 characters").optional().or(z.literal("")),
   job_title: z.string().max(200, "Job title must be less than 200 characters").optional().or(z.literal("")),
   bio: z.string().max(1000, "Bio must be less than 1000 characters").optional().or(z.literal("")),

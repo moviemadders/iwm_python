@@ -8,6 +8,21 @@ from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
+
+# Monkeypatch PostgreSQL types to work with SQLite
+import sqlalchemy.dialects.postgresql
+from sqlalchemy.types import JSON, TypeDecorator
+
+class SQLiteArray(TypeDecorator):
+    impl = JSON
+    def process_bind_param(self, value, dialect):
+        return value
+    def process_result_value(self, value, dialect):
+        return value
+
+sqlalchemy.dialects.postgresql.JSONB = JSON
+sqlalchemy.dialects.postgresql.ARRAY = SQLiteArray
+
 from src.models import (
     User, Movie, Review, Watchlist, Collection, Favorite, 
     Pulse, Scene, VisualTreat, CriticReview, Genre,

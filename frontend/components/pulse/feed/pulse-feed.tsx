@@ -7,7 +7,7 @@
 
 import { motion } from 'framer-motion'
 import { PulsePost, PulseComment } from '@/types/pulse'
-import PulseCard from './pulse-card'
+import { PulseCard } from '../pulse-card'  // Use the correct PulseCard that matches backend data
 import InfiniteScrollTrigger from './infinite-scroll-trigger'
 import LoadingSpinner from './loading-spinner'
 import EmptyState from './empty-state'
@@ -77,13 +77,9 @@ export default function PulseFeed({
             }}
           >
             <PulseCard
-              post={post}
-              comments={comments[post.id] || []}
-              onLike={onLike}
+              pulse={post}
+              onReaction={onLike}
               onComment={onComment}
-              onEcho={onEcho}
-              onBookmark={onBookmark}
-              onPulseDeleted={onPulseDeleted}
             />
           </motion.div>
         ))}

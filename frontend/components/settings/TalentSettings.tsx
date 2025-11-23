@@ -46,6 +46,7 @@ export function TalentSettings() {
         const profile = await getRoleProfile("talent")
         if (profile) {
           reset({
+            handle: profile.handle || "",
             stage_name: profile.stage_name || "",
             bio: profile.bio || "",
             headshot_url: profile.headshot_url || "",
@@ -114,6 +115,18 @@ export function TalentSettings() {
 
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Handle */}
+          <div className="space-y-2">
+            <Label htmlFor="handle">Talent Handle</Label>
+            <Input
+              id="handle"
+              placeholder="Unique talent handle"
+              className="bg-gray-700 border-gray-600 text-gray-100"
+              {...register("handle")}
+            />
+            {errors.handle && <p className="text-sm text-red-500">{errors.handle.message}</p>}
+          </div>
+
           {/* Professional Name */}
           <div className="space-y-2">
             <Label htmlFor="stage_name">Stage Name / Professional Name</Label>

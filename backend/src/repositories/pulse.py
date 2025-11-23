@@ -5,11 +5,11 @@ from typing import Any, Dict, List, Optional, Tuple
 import json
 import uuid
 
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, or_, and_, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Pulse, User, UserFollow, Movie
+from ..models import Pulse, User, UserFollow, Movie, UserSettings, PulseReaction, PulseComment
 
 
 def _slugify_username(name: str | None) -> str:
@@ -39,6 +39,9 @@ def _parse_json_obj(text: Optional[str]) -> Dict[str, int]:
         return {}
 
 
+from sqlalchemy.orm import selectinload, noload
+
+
 class PulseRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -46,7 +49,12 @@ class PulseRepository:
     def _base_query(self):
         return (
             select(Pulse)
-            .options(selectinload(Pulse.user), selectinload(Pulse.linked_movie))
+            .options(
+                selectinload(Pulse.user),
+                selectinload(Pulse.linked_movie),
+                noload(Pulse.reactions),  # Don't load reactions - we use aggregated counts
+                noload(Pulse.comments)   # Don't load comments - we use aggregated counts
+            )
         )
 
     async def list_feed(
@@ -56,8 +64,50 @@ class PulseRepository:
         page: int = 1,
         limit: int = 20,
         viewer_external_id: Optional[str] = None,
+        hashtag: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         q = self._base_query()
+
+        # Join UserSettings to check privacy
+        # Use outer join because if no settings exist, default is public
+        q = q.outerjoin(UserSettings, Pulse.user_id == UserSettings.user_id)
+
+        # Determine viewer ID if logged in
+        viewer_id = None
+        if viewer_external_id:
+            viewer_res = await self.session.execute(select(User.id).where(User.external_id == viewer_external_id))
+            viewer_id = viewer_res.scalar_one_or_none()
+
+        # Apply Privacy Filter:
+        # Show post IF:
+        # 1. It's the viewer's own post
+        # 2. OR The author's profileVisibility is NOT 'private' (public or followers_only)
+        #    (If UserSettings is NULL, it's public)
+        
+        privacy_condition = or_(
+            UserSettings.user_id.is_(None),  # No settings = Public
+            func.jsonb_extract_path_text(UserSettings.privacy, 'profileVisibility') != 'private'
+        )
+
+        if viewer_id:
+            # If viewer is logged in, they can also see their own private posts
+            q = q.where(or_(
+                Pulse.user_id == viewer_id,
+                privacy_condition
+            ))
+        else:
+            # Guest: only see public
+            q = q.where(privacy_condition)
+
+        # Hashtag filtering
+        if hashtag:
+            # Filter by hashtag in content.hashtags JSON array
+            # Remove # prefix if present
+            clean_hashtag = hashtag.lstrip('#').lower()
+            q = q.where(func.jsonb_path_exists(
+                Pulse.content,
+                f'$.hashtags[*] ? (@ like_regex "{clean_hashtag}" flag "i")'
+            ))
 
         # Window handling
         now = datetime.utcnow()
@@ -74,16 +124,12 @@ class PulseRepository:
         elif filter_type == "trending":
             q = q.where(Pulse.created_at >= (now - delta)).order_by(desc(Pulse.reactions_total + Pulse.comments_count + Pulse.shares_count))
         elif filter_type == "following":
-            if viewer_external_id:
-                viewer = (await self.session.execute(select(User).where(User.external_id == viewer_external_id))).scalar_one_or_none()
-                if viewer:
-                    following_rows = (
-                        await self.session.execute(select(UserFollow.following_id).where(UserFollow.follower_id == viewer.id))
-                    ).scalars().all()
-                    if following_rows:
-                        q = q.where(Pulse.user_id.in_(following_rows)).order_by(desc(Pulse.created_at))
-                    else:
-                        return []
+            if viewer_id:
+                following_rows = (
+                    await self.session.execute(select(UserFollow.following_id).where(UserFollow.follower_id == viewer_id))
+                ).scalars().all()
+                if following_rows:
+                    q = q.where(Pulse.user_id.in_(following_rows)).order_by(desc(Pulse.created_at))
                 else:
                     return []
             else:
@@ -99,7 +145,19 @@ class PulseRepository:
         q = q.limit(limit).offset((page - 1) * limit)
         rows = (await self.session.execute(q)).scalars().all()
 
-        return [self._to_dto(p) for p in rows]
+        # Fetch user reactions if viewer is logged in
+        user_reactions = {}
+        if viewer_id and rows:
+            pulse_ids = [p.id for p in rows]
+            q_reactions = select(PulseReaction).where(
+                PulseReaction.user_id == viewer_id,
+                PulseReaction.pulse_id.in_(pulse_ids)
+            )
+            reactions_rows = (await self.session.execute(q_reactions)).scalars().all()
+            for r in reactions_rows:
+                user_reactions[r.pulse_id] = r.type
+
+        return [self._to_dto(p, user_reactions.get(p.id)) for p in rows]
 
     async def trending_topics(self, window: str = "7d", limit: int = 10) -> List[Dict[str, Any]]:
         now = datetime.utcnow()
@@ -136,11 +194,11 @@ class PulseRepository:
         ]
         return out
 
-    def _to_dto(self, p: Pulse) -> Dict[str, Any]:
+    def _to_dto(self, p: Pulse, user_reaction: Optional[str] = None) -> Dict[str, Any]:
         user = p.user
         username = _slugify_username(getattr(user, "name", None))
         display_name = getattr(user, "name", "User")
-        avatar_url = getattr(user, "avatar_url", None) or "/user-avatar.png"
+        avatar_url = getattr(user, "avatar_url", None)  # Return None if no avatar
 
         media = _parse_json_array(p.content_media)
         reactions = _parse_json_obj(p.reactions_json)
@@ -183,6 +241,7 @@ class PulseRepository:
                     **reactions,
                     "total": total,
                 },
+                "userReaction": user_reaction,
                 "comments": p.comments_count,
                 "shares": p.shares_count,
                 "hasCommented": False,
@@ -253,3 +312,132 @@ class PulseRepository:
         await self.session.flush()
         return True
 
+
+    async def toggle_reaction(self, user_id: int, pulse_id: str, reaction_type: str) -> Dict[str, Any]:
+        """Toggle a reaction on a pulse"""
+        # Get pulse
+        q = select(Pulse).where(Pulse.external_id == pulse_id)
+        pulse = (await self.session.execute(q)).scalar_one_or_none()
+        if not pulse:
+            raise ValueError("Pulse not found")
+
+        # Check existing reaction
+        q_reaction = select(PulseReaction).where(
+            PulseReaction.user_id == user_id,
+            PulseReaction.pulse_id == pulse.id
+        )
+        existing = (await self.session.execute(q_reaction)).scalar_one_or_none()
+
+        reactions_map = _parse_json_obj(pulse.reactions_json)
+        
+        if existing:
+            if existing.type == reaction_type:
+                # Remove reaction (toggle off)
+                await self.session.delete(existing)
+                reactions_map[reaction_type] = max(0, reactions_map.get(reaction_type, 0) - 1)
+                pulse.reactions_total = max(0, pulse.reactions_total - 1)
+                user_reaction = None
+            else:
+                # Change reaction type
+                old_type = existing.type
+                existing.type = reaction_type
+                reactions_map[old_type] = max(0, reactions_map.get(old_type, 0) - 1)
+                reactions_map[reaction_type] = reactions_map.get(reaction_type, 0) + 1
+                user_reaction = reaction_type
+        else:
+            # Add new reaction
+            new_reaction = PulseReaction(user_id=user_id, pulse_id=pulse.id, type=reaction_type)
+            self.session.add(new_reaction)
+            reactions_map[reaction_type] = reactions_map.get(reaction_type, 0) + 1
+            pulse.reactions_total += 1
+            user_reaction = reaction_type
+
+        pulse.reactions_json = json.dumps(reactions_map)
+        await self.session.flush()
+        
+        return {
+            "reactions": {
+                **{"love": 0, "fire": 0, "mindblown": 0, "laugh": 0, "sad": 0, "angry": 0},
+                **reactions_map,
+                "total": pulse.reactions_total,
+            },
+            "userReaction": user_reaction
+        }
+
+    async def add_comment(self, user_id: int, pulse_id: str, content: str) -> Dict[str, Any]:
+        """Add a comment to a pulse"""
+        # Get pulse
+        q = select(Pulse).where(Pulse.external_id == pulse_id)
+        pulse = (await self.session.execute(q)).scalar_one_or_none()
+        if not pulse:
+            raise ValueError("Pulse not found")
+
+        # Create comment
+        comment = PulseComment(
+            external_id=str(uuid.uuid4()),
+            user_id=user_id,
+            pulse_id=pulse.id,
+            content=content,
+            created_at=datetime.utcnow()
+        )
+        self.session.add(comment)
+        
+        # Update pulse comment count
+        pulse.comments_count += 1
+        
+        await self.session.flush()
+        await self.session.refresh(comment, ["user"])
+
+        return {
+            "id": comment.external_id,
+            "postId": pulse_id,
+            "author": {
+                "id": comment.user.external_id,
+                "username": comment.user.username or "user",
+                "displayName": comment.user.name,
+                "avatarUrl": comment.user.avatar_url,
+                "isVerified": False
+            },
+            "content": comment.content,
+            "like_count": 0,
+            "created_at": comment.created_at.isoformat() + "Z",
+            "is_liked": False
+        }
+
+    async def get_comments(self, pulse_id: str, page: int = 1, limit: int = 20) -> List[Dict[str, Any]]:
+        """Get comments for a pulse"""
+        # Get pulse
+        q_pulse = select(Pulse.id).where(Pulse.external_id == pulse_id)
+        pulse_db_id = (await self.session.execute(q_pulse)).scalar_one_or_none()
+        if not pulse_db_id:
+            return []
+
+        q = (
+            select(PulseComment)
+            .where(PulseComment.pulse_id == pulse_db_id)
+            .options(selectinload(PulseComment.user))
+            .order_by(desc(PulseComment.created_at))
+            .limit(limit)
+            .offset((page - 1) * limit)
+        )
+        
+        comments = (await self.session.execute(q)).scalars().all()
+        
+        return [
+            {
+                "id": c.external_id,
+                "postId": pulse_id,
+                "author": {
+                    "id": c.user.external_id,
+                    "username": c.user.username or "user",
+                    "displayName": c.user.name,
+                    "avatarUrl": c.user.avatar_url,
+                    "isVerified": False
+                },
+                "content": c.content,
+                "like_count": c.like_count,
+                "created_at": c.created_at.isoformat() + "Z",
+                "is_liked": False
+            }
+            for c in comments
+        ]

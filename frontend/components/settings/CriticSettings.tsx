@@ -35,6 +35,7 @@ export function CriticSettings() {
         const profile = await getRoleProfile("critic")
         if (profile) {
           reset({
+            handle: profile.handle || "",
             bio: profile.bio || "",
             twitter_url: profile.twitter_url || "",
             letterboxd_url: profile.letterboxd_url || "",
@@ -100,6 +101,19 @@ export function CriticSettings() {
 
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Handle / Channel Name */}
+          <div className="space-y-2">
+            <Label htmlFor="handle">Channel Name / Handle</Label>
+            <Input
+              id="handle"
+              placeholder="Unique critic handle (e.g. BestMoviesChannel)"
+              className="bg-gray-700 border-gray-600 text-gray-100"
+              {...register("handle")}
+            />
+            {errors.handle && <p className="text-sm text-red-500">{errors.handle.message}</p>}
+            <p className="text-xs text-gray-400">Unique identifier for your critic profile.</p>
+          </div>
+
           {/* Bio */}
           <div className="space-y-2">
             <Label htmlFor="bio">Bio / About</Label>

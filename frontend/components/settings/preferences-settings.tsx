@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -14,39 +14,77 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
+import { apiGet, apiPut } from "@/lib/api-client"
+import { Skeleton } from "@/components/ui/skeleton"
+
+interface PreferencesData {
+  language: string
+  region: string
+  hideSpoilers: boolean
+  excludedGenres: string[]
+  contentRating: string
+}
 
 export function PreferencesSettings() {
   const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [preferences, setPreferences] = useState({
-    language: "en",
-    region: "US",
-    hideSpoilers: true,
-    excludedGenres: ["Horror"],
-    contentRating: "PG-13",
-  })
+  const [preferences, setPreferences] = useState<PreferencesData | null>(null)
+  const [originalPreferences, setOriginalPreferences] = useState<PreferencesData | null>(null)
+
+  useEffect(() => {
+    const loadPreferences = async () => {
+      try {
+        setIsLoading(true)
+        const data = await apiGet<PreferencesData>("/api/v1/settings/preferences")
+        setPreferences(data)
+        setOriginalPreferences(data)
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load preferences",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadPreferences()
+  }, [toast])
 
   const handleLanguageChange = (value: string) => {
-    setPreferences((prev) => ({ ...prev, language: value }))
+    if (preferences) {
+      setPreferences({ ...preferences, language: value })
+    }
   }
 
   const handleRegionChange = (value: string) => {
-    setPreferences((prev) => ({ ...prev, region: value }))
+    if (preferences) {
+      setPreferences({ ...preferences, region: value })
+    }
   }
 
   const handleContentRatingChange = (value: string) => {
-    setPreferences((prev) => ({ ...prev, contentRating: value }))
+    if (preferences) {
+      setPreferences({ ...preferences, contentRating: value })
+    }
   }
 
   const handleSpoilersChange = (checked: boolean) => {
-    setPreferences((prev) => ({ ...prev, hideSpoilers: checked }))
+    if (preferences) {
+      setPreferences({ ...preferences, hideSpoilers: checked })
+    }
   }
 
   const handleSave = async () => {
+    if (!preferences) return
+
     setIsSaving(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const updated = await apiPut<PreferencesData>("/api/v1/settings/preferences", preferences)
+      setPreferences(updated)
+      setOriginalPreferences(updated)
       toast({
         title: "Success",
         description: "Preferences updated successfully!",
@@ -61,6 +99,28 @@ export function PreferencesSettings() {
       setIsSaving(false)
     }
   }
+
+  if (isLoading) {
+    return (
+      <Card className="bg-gray-800 border-gray-700 text-gray-100">
+        <CardHeader>
+          <CardTitle>Content Preferences</CardTitle>
+          <CardDescription className="text-gray-400">
+            Customize your content recommendations and viewing experience.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!preferences) return null
+
+  const isDirty = JSON.stringify(preferences) !== JSON.stringify(originalPreferences)
 
   return (
     <Card className="bg-gray-800 border-gray-700 text-gray-100">
@@ -140,12 +200,21 @@ export function PreferencesSettings() {
         <div className="flex gap-3 pt-4 border-t border-gray-700">
           <Button
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || !isDirty}
             className="bg-sky-600 hover:bg-sky-500 text-white gap-2"
           >
             {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
             {isSaving ? "Saving..." : "Save Changes"}
           </Button>
+          {isDirty && (
+            <Button
+              variant="outline"
+              onClick={() => setPreferences(originalPreferences)}
+              className="border-gray-600 text-gray-300 hover:bg-gray-700"
+            >
+              Cancel
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

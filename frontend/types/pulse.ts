@@ -109,29 +109,56 @@ export type PulsePostType = 'original' | 'echo' | 'quote_echo'
 /**
  * Main pulse post interface
  */
+/**
+ * Pulse user info (matching Backend DTO)
+ */
+export interface PulseUserInfo {
+  id?: string
+  username: string
+  displayName: string
+  avatarUrl: string
+  isVerified: boolean
+  verificationLevel?: string
+  isFollowing?: boolean
+}
+
+/**
+ * Main pulse post interface (matching Backend DTO)
+ */
 export interface PulsePost {
   id: string
-  type: PulsePostType
-  author: PulseUser
-  content: string
-  media: PulseMedia[]
-  tagged_items: TaggedItem[]
-  like_count: number
-  comment_count: number
-  echo_count: number
-  bookmark_count: number
-  view_count: number
-  created_at: string
-  is_liked: boolean
-  is_echoed: boolean
-  is_bookmarked: boolean
-  
-  // For echo and quote_echo types
-  original_post?: PulsePost
-  echoed_by?: PulseUser
-  
-  // For quote_echo type
-  quote_content?: string
+  userId: string
+  userInfo: PulseUserInfo
+  content: {
+    text: string
+    media?: PulseMedia[]
+    linkedContent?: {
+      type: string
+      id: string
+      title: string
+      posterUrl?: string
+    }
+    hashtags?: string[]
+  }
+  engagement: {
+    reactions: {
+      love: number
+      fire: number
+      mindblown: number
+      laugh: number
+      sad: number
+      angry: number
+      total: number
+    }
+    userReaction?: string
+    comments: number
+    shares: number
+    hasCommented: boolean
+    hasShared: boolean
+    hasBookmarked: boolean
+  }
+  timestamp: string
+  editedAt?: string
 }
 
 // ============================================================================
@@ -143,8 +170,8 @@ export interface PulsePost {
  */
 export interface PulseComment {
   id: string
-  post_id: string
-  author: PulseUser
+  postId: string
+  author: PulseUserInfo
   content: string
   like_count: number
   created_at: string

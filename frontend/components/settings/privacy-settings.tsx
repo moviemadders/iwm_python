@@ -2,13 +2,16 @@
 // Ensuring it's here for completeness if it was accidentally removed.
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ShieldCheck, EyeOff, Users, Lock } from "lucide-react"
+import { ShieldCheck, EyeOff, Users, Lock, Loader2 } from "lucide-react"
+import { apiGet, apiPut } from "@/lib/api-client"
+import { useToast } from "@/hooks/use-toast"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface PrivacySettingsData {
   profileVisibility: "public" | "followers" | "private"
@@ -17,34 +20,92 @@ interface PrivacySettingsData {
   dataDownloadRequested: boolean
 }
 
-const initialSettings: PrivacySettingsData = {
-  profileVisibility: "public",
-  activitySharing: true,
-  messageRequests: "followers",
-  dataDownloadRequested: false,
-}
-
 export function PrivacySettings() {
-  const [settings, setSettings] = useState<PrivacySettingsData>(initialSettings)
+  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [settings, setSettings] = useState<PrivacySettingsData | null>(null)
+  const [originalSettings, setOriginalSettings] = useState<PrivacySettingsData | null>(null)
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        setIsLoading(true)
+        const data = await apiGet<PrivacySettingsData>("/api/v1/settings/privacy")
+        setSettings(data)
+        setOriginalSettings(data)
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load privacy settings",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadSettings()
+  }, [toast])
 
   const handleSettingChange = (key: keyof PrivacySettingsData, value: any) => {
-    setSettings((prev) => ({ ...prev, [key]: value }))
+    if (settings) {
+      setSettings({ ...settings, [key]: value })
+    }
   }
 
   const handleSaveChanges = async () => {
+    if (!settings) return
+
     setIsSaving(true)
-    console.log("Saving privacy settings:", settings)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setIsSaving(false)
-    alert("Privacy settings updated!") // Replace with toast
+    try {
+      const updated = await apiPut<PrivacySettingsData>("/api/v1/settings/privacy", settings)
+      setSettings(updated)
+      setOriginalSettings(updated)
+      toast({
+        title: "Success",
+        description: "Privacy settings updated successfully!",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save privacy settings",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleDataDownload = () => {
     handleSettingChange("dataDownloadRequested", true)
-    alert("Data download request submitted. You'll receive an email when it's ready.") // Replace with toast
+    toast({
+      title: "Request Submitted",
+      description: "You'll receive an email when your data is ready.",
+    })
   }
+
+  if (isLoading) {
+    return (
+      <Card className="bg-gray-800 border-gray-700 text-gray-100">
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center">
+            <ShieldCheck className="h-6 w-6 mr-2 text-sky-400" /> Privacy Settings
+          </CardTitle>
+          <CardDescription className="text-gray-400">Control your privacy and data sharing preferences.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!settings) return null
+
+  const isDirty = JSON.stringify(settings) !== JSON.stringify(originalSettings)
 
   return (
     <Card className="bg-gray-800 border-gray-700 text-gray-100">
@@ -144,10 +205,24 @@ export function PrivacySettings() {
           <p className="text-xs text-gray-500">Request a copy of your personal data stored on Siddu.</p>
         </div>
       </CardContent>
-      <CardFooter className="border-t border-gray-700 pt-6">
-        <Button onClick={handleSaveChanges} disabled={isSaving} className="bg-sky-600 hover:bg-sky-500 text-white">
+      <CardFooter className="border-t border-gray-700 pt-6 flex gap-3">
+        <Button
+          onClick={handleSaveChanges}
+          disabled={isSaving || !isDirty}
+          className="bg-sky-600 hover:bg-sky-500 text-white gap-2"
+        >
+          {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
           {isSaving ? "Saving..." : "Save Privacy Settings"}
         </Button>
+        {isDirty && (
+          <Button
+            variant="outline"
+            onClick={() => setSettings(originalSettings)}
+            className="border-gray-600 text-gray-300 hover:bg-gray-700"
+          >
+            Cancel
+          </Button>
+        )}
       </CardFooter>
     </Card>
   )

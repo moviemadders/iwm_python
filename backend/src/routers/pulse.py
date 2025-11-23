@@ -28,10 +28,18 @@ async def get_feed(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     viewerId: Optional[str] = Query(None),
+    hashtag: Optional[str] = Query(None),
     session: AsyncSession = Depends(get_session),
 ):
     repo = PulseRepository(session)
-    return await repo.list_feed(filter_type=filter, window=window, page=page, limit=limit, viewer_external_id=viewerId)
+    return await repo.list_feed(
+        filter_type=filter,
+        window=window,
+        page=page,
+        limit=limit,
+        viewer_external_id=viewerId,
+        hashtag=hashtag
+    )
 
 
 @router.get("/trending-topics")
@@ -93,3 +101,72 @@ async def delete_pulse(
         await session.rollback()
         raise HTTPException(status_code=500, detail="Failed to delete pulse")
 
+
+class ReactionBody(BaseModel):
+    type: str = Field(..., pattern="^(love|fire|mindblown|laugh|sad|angry)$")
+
+
+class CommentBody(BaseModel):
+    content: str = Field(..., min_length=1, max_length=1000)
+
+
+@router.post("/{pulse_id}/reactions")
+async def toggle_reaction(
+    pulse_id: str,
+    body: ReactionBody,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Toggle a reaction on a pulse"""
+    repo = PulseRepository(session)
+    try:
+        result = await repo.toggle_reaction(
+            user_id=current_user.id,
+            pulse_id=pulse_id,
+            reaction_type=body.type,
+        )
+        await session.commit()
+        return result
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to toggle reaction")
+
+
+@router.post("/{pulse_id}/comments")
+async def add_comment(
+    pulse_id: str,
+    body: CommentBody,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Add a comment to a pulse"""
+    repo = PulseRepository(session)
+    try:
+        result = await repo.add_comment(
+            user_id=current_user.id,
+            pulse_id=pulse_id,
+            content=body.content,
+        )
+        await session.commit()
+        return result
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to add comment")
+
+
+@router.get("/{pulse_id}/comments")
+async def get_comments(
+    pulse_id: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+) -> Any:
+    """Get comments for a pulse"""
+    repo = PulseRepository(session)
+    return await repo.get_comments(pulse_id=pulse_id, page=page, limit=limit)

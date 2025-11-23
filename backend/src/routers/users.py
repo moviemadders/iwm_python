@@ -57,10 +57,16 @@ async def get_user_by_username(
     """
     user = None
 
-    # Try exact email match first
-    query = select(User).where(User.email == username)
+    # Try exact username match first (new field)
+    query = select(User).where(User.username == username)
     result = await session.execute(query)
     user = result.scalar_one_or_none()
+
+    # If not found, try exact email match
+    if not user:
+        query = select(User).where(User.email == username)
+        result = await session.execute(query)
+        user = result.scalar_one_or_none()
 
     # If not found, try email prefix (limit to 1 to avoid MultipleResultsFound error)
     if not user:
@@ -103,12 +109,15 @@ async def get_user_by_username(
     # Get user stats
     stats = await get_user_stats_internal(user.id, session)
 
-    # Extract username from email
-    email_username = user.email.split('@')[0] if '@' in user.email else user.email
+    # Determine display username
+    display_username = user.username
+    if not display_username:
+        # Fallback to email prefix if username not set
+        display_username = user.email.split('@')[0] if '@' in user.email else user.email
 
     return UserProfileResponse(
         id=user.external_id,
-        username=email_username,
+        username=display_username,
         name=user.name,
         email=user.email,
         bio=None,  # TODO: Add bio field to User model

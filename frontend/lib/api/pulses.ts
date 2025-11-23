@@ -71,3 +71,69 @@ export async function deletePulse(pulseId: string) {
   }
 }
 
+/**
+ * Toggle reaction on a pulse
+ */
+export async function toggleReaction(pulseId: string, type: string) {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/pulse/${pulseId}/reactions`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ type }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || `Failed to toggle reaction: ${response.statusText}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error("Error toggling reaction:", error)
+    throw error
+  }
+}
+
+/**
+ * Add a comment to a pulse
+ */
+export async function createComment(pulseId: string, content: string) {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/pulse/${pulseId}/comments`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ content }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || `Failed to create comment: ${response.statusText}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error("Error creating comment:", error)
+    throw error
+  }
+}
+
+/**
+ * Get comments for a pulse
+ */
+export async function getComments(pulseId: string, page = 1) {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/pulse/${pulseId}/comments?page=${page}`, {
+      headers: getAuthHeaders(),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || `Failed to get comments: ${response.statusText}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error("Error getting comments:", error)
+    throw error
+  }
+}

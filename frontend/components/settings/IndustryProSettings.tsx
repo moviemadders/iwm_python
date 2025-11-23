@@ -39,6 +39,7 @@ export function IndustryProSettings() {
         const profile = await getRoleProfile("industry")
         if (profile) {
           reset({
+            handle: profile.handle || "",
             company_name: profile.company_name || "",
             job_title: profile.job_title || "",
             bio: profile.bio || "",
@@ -106,6 +107,18 @@ export function IndustryProSettings() {
 
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Handle */}
+          <div className="space-y-2">
+            <Label htmlFor="handle">Industry Handle</Label>
+            <Input
+              id="handle"
+              placeholder="Unique industry handle"
+              className="bg-gray-700 border-gray-600 text-gray-100"
+              {...register("handle")}
+            />
+            {errors.handle && <p className="text-sm text-red-500">{errors.handle.message}</p>}
+          </div>
+
           {/* Company & Position */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

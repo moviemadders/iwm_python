@@ -9,6 +9,20 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
+from sqlalchemy.types import JSON, TypeDecorator
+from .config import settings
+
+# Monkeypatch for SQLite
+if "sqlite" in (settings.database_url or ""):
+    class SQLiteArray(TypeDecorator):
+        impl = JSON
+        def process_bind_param(self, value, dialect):
+            return value
+        def process_result_value(self, value, dialect):
+            return value
+            
+    JSONB = JSON
+    ARRAY = SQLiteArray
 
 
 # Enums for multi-role profile system
@@ -245,6 +259,7 @@ class User(Base):
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
     website: Mapped[str | None] = mapped_column(String(500), nullable=True)
     active_role: Mapped[str | None] = mapped_column(String(50), nullable=True, default="lover")  # Current active role for multi-role users
+    username: Mapped[str | None] = mapped_column(String(50), unique=True, index=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=datetime.utcnow, nullable=True)
 
@@ -269,7 +284,7 @@ class UserRoleProfile(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="public")
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    handle: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    handle: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
@@ -783,6 +798,42 @@ class Pulse(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     edited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    reactions: Mapped[List["PulseReaction"]] = relationship(back_populates="pulse", cascade="all, delete-orphan", lazy="selectin")
+    comments: Mapped[List["PulseComment"]] = relationship(back_populates="pulse", cascade="all, delete-orphan", lazy="selectin")
+
+class PulseReaction(Base):
+    __tablename__ = "pulse_reactions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "pulse_id", name="uq_pulse_reaction_user_pulse"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    pulse_id: Mapped[int] = mapped_column(ForeignKey("pulses.id"))
+    type: Mapped[str] = mapped_column(String(20))  # love, fire, mindblown, laugh, sad, angry
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship(lazy="selectin")
+    pulse: Mapped["Pulse"] = relationship(back_populates="reactions", lazy="selectin")
+
+
+class PulseComment(Base):
+    __tablename__ = "pulse_comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    external_id: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    pulse_id: Mapped[int] = mapped_column(ForeignKey("pulses.id"))
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=datetime.utcnow, nullable=True)
+
+    # Engagement
+    like_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    user: Mapped["User"] = relationship(lazy="selectin")
+    pulse: Mapped["Pulse"] = relationship(back_populates="comments", lazy="selectin")
 
 
 class TrendingTopic(Base):
