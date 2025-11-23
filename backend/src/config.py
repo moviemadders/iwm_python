@@ -2,7 +2,7 @@ import json
 import os
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
 
@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     app_name: str = Field(default="movie-madders-api")
     log_level: str = Field(default="INFO")
     # Example: postgresql+asyncpg://user:pass@localhost:5432/moviemadders
-    database_url: str | None = Field(default=None)
+    database_url: Union[str, None] = Field(default=None)
     export_openapi_on_startup: bool = Field(default=False)
 
     # CORS Origins - Configured via CORS_ORIGINS environment variable
@@ -27,14 +27,14 @@ class Settings(BaseSettings):
     refresh_token_exp_days: int = Field(default=int(os.getenv("REFRESH_TOKEN_EXP_DAYS", "7")))
 
     # External API keys
-    tmdb_api_key: str | None = Field(default=None)
-    gemini_api_key: str | None = Field(default=None)
+    tmdb_api_key: Union[str, None] = Field(default=None)
+    gemini_api_key: Union[str, None] = Field(default=None)
     gemini_model: str = Field(default="gemini-2.5-flash")
 
     # Cloudinary
-    cloudinary_cloud_name: str | None = Field(default=None)
-    cloudinary_api_key: str | None = Field(default=None)
-    cloudinary_api_secret: str | None = Field(default=None)
+    cloudinary_cloud_name: Union[str, None] = Field(default=None)
+    cloudinary_api_key: Union[str, None] = Field(default=None)
+    cloudinary_api_secret: Union[str, None] = Field(default=None)
 
     # Pydantic v2: load .env from backend app folder regardless of cwd
     model_config = SettingsConfigDict(

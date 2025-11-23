@@ -3,7 +3,7 @@
 import { motion } from "framer-motion"
 import type { UserReviewsTabProps } from "@/types/review-page"
 import ReviewFilterBar from "./review-filter-bar"
-import UserReviewCard from "./user-review-card"
+import UserReviewCardV2 from "./user-review-card-v2"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 
@@ -91,7 +91,7 @@ export default function UserReviewsTab({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: index * 0.03 }}
             >
-              <UserReviewCard
+              <UserReviewCardV2
                 review={review}
                 isCurrentUser={currentUserId === review.user.username}
                 onHelpfulClick={handleHelpfulClick}

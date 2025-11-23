@@ -365,6 +365,7 @@ class Review(Base):
     comment_count: Mapped[int] = mapped_column(Integer, default=0)
     engagement_score: Mapped[int] = mapped_column(Integer, default=0)
     media_urls: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON array as text
+    gif_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # GIF URL from Tenor/Giphy
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id"))
@@ -829,11 +830,25 @@ class PulseComment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=datetime.utcnow, nullable=True)
 
-    # Engagement
-    like_count: Mapped[int] = mapped_column(Integer, default=0)
-
     user: Mapped["User"] = relationship(lazy="selectin")
     pulse: Mapped["Pulse"] = relationship(back_populates="comments", lazy="selectin")
+
+
+class PulseBookmark(Base):
+    __tablename__ = "pulse_bookmarks"
+    __table_args__ = (
+        UniqueConstraint("user_id", "pulse_id", name="uq_pulse_bookmark_user_pulse"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    pulse_id: Mapped[int] = mapped_column(ForeignKey("pulses.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship(lazy="selectin")
+    pulse: Mapped["Pulse"] = relationship(lazy="selectin")
+
+
 
 
 class TrendingTopic(Base):

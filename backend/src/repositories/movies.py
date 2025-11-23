@@ -257,3 +257,11 @@ class MovieRepository:
             for m in movies
         ]
 
+    async def get_movie_by_external_id(self, external_id: str) -> Movie | None:
+        """Get movie model by external ID"""
+        if not self.session:
+            return None
+        q = select(Movie).where(Movie.external_id == external_id)
+        res = await self.session.execute(q)
+        return res.scalar_one_or_none()
+

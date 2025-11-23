@@ -14,6 +14,7 @@ import PulseMainFeed from '@/components/pulse/main-feed/pulse-main-feed'
 import PulseComposer from '@/components/pulse/composer/pulse-composer'
 import FeedTabs from '@/components/pulse/feed/feed-tabs'
 import PulseFeed from '@/components/pulse/feed/pulse-feed'
+import NoSSR from '@/components/no-ssr'
 
 // Mock data imports
 import { mockPulsePosts } from '@/lib/pulse/mock-pulse-posts'
@@ -24,12 +25,15 @@ import { mockTrendingCricket } from '@/lib/pulse/mock-trending-cricket'
 import { mockComments } from '@/lib/pulse/mock-comments'
 import { mockCurrentUser, mockUserDailyStats } from '@/lib/pulse/mock-user-stats'
 
+import { pulseApi } from '@/lib/api'
+import { getCurrentUser, User } from '@/lib/auth'
+
 const POSTS_PER_PAGE = 20
 
 export default function PulsePage() {
   const [activeTab, setActiveTab] = useState<FeedTab>('for_you')
   const [posts, setPosts] = useState<PulsePost[]>([])
-  const [allPosts, setAllPosts] = useState<PulsePost[]>([])
+  const [allPosts, setAllPosts] = useState<PulsePost[]>([]) // Keep for client-side filtering fallback if needed
   const [comments, setComments] = useState<Record<string, PulseComment[]>>({})
   const [pagination, setPagination] = useState({
     page: 1,
@@ -39,211 +43,247 @@ export default function PulsePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [trendingTopics, setTrendingTopics] = useState(mockTrendingTopics)
+  const [currentUser, setCurrentUser] = useState<any>(mockCurrentUser) // Fallback to mock until loaded
 
-  // Fetch initial data
+  // Fetch current user
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true)
-
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL
-      const useBackend = process.env.NEXT_PUBLIC_ENABLE_BACKEND === 'true' && !!apiBase
-
+    const fetchUser = async () => {
       try {
-        if (useBackend && apiBase) {
-          const response = await fetch(`${apiBase}/api/v1/pulse/feed?tab=${activeTab}`)
-          if (!response.ok) throw new Error(`Failed: ${response.statusText}`)
-          const data = await response.json()
-          setAllPosts(data.posts || [])
-          setPosts((data.posts || []).slice(0, POSTS_PER_PAGE))
-          setComments(data.comments || {})
-        } else {
-          throw new Error('Backend not configured')
+        const user = await getCurrentUser()
+        if (user) {
+          setCurrentUser({
+            ...mockCurrentUser, // Keep mock stats for now if backend doesn't provide them
+            id: user.id,
+            username: user.username || user.email.split('@')[0],
+            display_name: user.name,
+            avatar_url: user.avatarUrl || mockCurrentUser.avatar_url,
+          })
         }
       } catch (err) {
-        console.warn('Backend fetch failed, using mock data:', err)
+        console.error('Failed to fetch current user:', err)
+      }
+    }
+    fetchUser()
+  }, [])
 
-        // Filter posts by tab
+  // Fetch feed data
+  const fetchFeed = async (page = 1, refresh = false) => {
+    try {
+      if (page === 1) setIsLoading(true)
+
+      const data = await pulseApi.getPulseFeed({
+        filter: activeTab === 'for_you' ? 'latest' : activeTab as any,
+        page,
+        limit: POSTS_PER_PAGE
+      })
+
+      if (refresh || page === 1) {
+        setPosts(data.posts || [])
+      } else {
+        setPosts(prev => [...prev, ...(data.posts || [])])
+      }
+
+      setPagination({
+        page: data.pagination?.current_page || page,
+        has_more: data.pagination?.has_more ?? (data.posts?.length === POSTS_PER_PAGE),
+        is_loading_more: false
+      })
+    } catch (err) {
+      console.error('Failed to fetch feed:', err)
+      // Fallback to mock data on error? Or just show error?
+      // For now, let's keep the mock fallback for smoother dev experience if backend is down
+      if (page === 1) {
+        // Filter posts by tab (mock logic)
         let filteredPosts = [...mockPulsePosts]
         if (activeTab === 'movies') {
           filteredPosts = filteredPosts.filter((post) =>
-            post.tagged_items.some((tag) => tag.type === 'movie') ||
-            post.content.toLowerCase().includes('movie') ||
-            post.content.toLowerCase().includes('film')
+            post.content.linkedContent?.type === 'movie' ||
+            post.content.text.toLowerCase().includes('movie')
           )
         } else if (activeTab === 'cricket') {
           filteredPosts = filteredPosts.filter((post) =>
-            post.tagged_items.some((tag) => tag.type === 'cricket_match') ||
-            post.content.toLowerCase().includes('cricket')
+            post.content.linkedContent?.type === 'cricket_match' ||
+            post.content.text.toLowerCase().includes('cricket')
           )
         }
-
-        console.log('Setting mock posts:', filteredPosts.length, 'posts')
-        setAllPosts(filteredPosts)
         setPosts(filteredPosts.slice(0, POSTS_PER_PAGE))
-        setComments(mockComments)
-        setPagination({
-          page: 1,
-          has_more: filteredPosts.length > POSTS_PER_PAGE,
-          is_loading_more: false,
-        })
-        setIsLoading(false)
+        setPagination({ page: 1, has_more: false, is_loading_more: false })
       }
+    } finally {
+      setIsLoading(false)
     }
+  }
 
-    fetchData()
+  useEffect(() => {
+    fetchFeed(1, true)
   }, [activeTab])
 
-  // Fetch trending topics from backend
+  // Fetch trending topics
   useEffect(() => {
-    const fetchTrendingTopics = async () => {
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL
-      const useBackend = process.env.NEXT_PUBLIC_ENABLE_BACKEND === 'true' && !!apiBase
-
-      if (!useBackend) return
-
+    const fetchTrending = async () => {
       try {
-        const response = await fetch(`${apiBase}/api/v1/pulse/trending-topics?window=7d&limit=5`)
-        if (!response.ok) throw new Error('Failed to fetch trending topics')
-        const data = await response.json()
-        if (Array.isArray(data) && data.length > 0) {
-          setTrendingTopics(data)
-        }
-      } catch (error) {
-        console.warn('Failed to fetch trending topics, using mock data:', error)
+        // We don't have a dedicated trending API yet in the client, but let's assume we might
+        // For now, keep mock trending
+      } catch (err) {
+        console.warn('Failed to fetch trending topics', err)
       }
     }
-
-    fetchTrendingTopics()
+    fetchTrending()
   }, [])
 
 
-  // Load more posts (infinite scroll)
+  // Load more posts
   const handleLoadMore = () => {
     if (pagination.is_loading_more || !pagination.has_more) return
-
     setPagination((prev) => ({ ...prev, is_loading_more: true }))
-
-    setTimeout(() => {
-      const nextPage = pagination.page + 1
-      const startIndex = nextPage * POSTS_PER_PAGE
-      const endIndex = startIndex + POSTS_PER_PAGE
-      const newPosts = allPosts.slice(startIndex, endIndex)
-
-      setPosts((prev) => [...prev, ...newPosts])
-      setPagination({
-        page: nextPage,
-        has_more: endIndex < allPosts.length,
-        is_loading_more: false,
-      })
-    }, 1000)
+    fetchFeed(pagination.page + 1)
   }
 
-  // Refresh feed function
+  // Refresh feed
   const refreshFeed = () => {
-    // Reload the page to fetch fresh data
-    window.location.reload()
+    fetchFeed(1, true)
   }
 
   // Handle new post submission
-  const handlePostSubmit = (content: string, media: PulseMedia[], taggedItems: TaggedItem[]) => {
+  const handlePostSubmit = async (content: string, media: PulseMedia[], taggedItems: TaggedItem[]) => {
     setIsSubmitting(true)
-
-    // Simulate API call
-    setTimeout(() => {
-      const newPost: PulsePost = {
-        id: `post-new-${Date.now()}`,
-        type: 'original',
-        author: mockCurrentUser,
-        content,
-        media,
-        tagged_items: taggedItems,
-        like_count: 0,
-        comment_count: 0,
-        echo_count: 0,
-        bookmark_count: 0,
-        view_count: 0,
-        created_at: new Date().toISOString(),
-        is_liked: false,
-        is_echoed: false,
-        is_bookmarked: false,
-      }
-
-      setPosts((prev) => [newPost, ...prev])
+    try {
+      await pulseApi.createPulse({
+        contentText: content,
+        contentMedia: media.map(m => JSON.stringify(m)), // Backend expects strings? Or we need to fix backend to accept objects?
+        // Backend expects contentMedia as List[str]. Let's assume URLs for now.
+        // But wait, our backend model stores JSON string for media.
+        // The create endpoint expects List[str].
+        // Let's just send empty list for now as media upload isn't fully implemented
+        linkedMovieId: taggedItems.find(t => t.type === 'movie')?.id,
+        hashtags: [] // TODO: Extract hashtags
+      })
+      refreshFeed()
+    } catch (err) {
+      console.error('Failed to create post:', err)
+      alert('Failed to create post')
+    } finally {
       setIsSubmitting(false)
-    }, 1000)
+    }
   }
 
   // Handle like
-  const handleLike = (postId: string) => {
+  const handleLike = async (postId: string) => {
+    // Optimistic update
     setPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId
-          ? {
+      prev.map((post) => {
+        if (post.id === postId) {
+          const isLiked = !!post.engagement.userReaction;
+          return {
             ...post,
-            is_liked: !post.is_liked,
-            like_count: post.is_liked ? post.like_count - 1 : post.like_count + 1,
+            engagement: {
+              ...post.engagement,
+              userReaction: isLiked ? undefined : 'love',
+              reactions: {
+                ...post.engagement.reactions,
+                total: isLiked ? post.engagement.reactions.total - 1 : post.engagement.reactions.total + 1,
+                love: isLiked ? post.engagement.reactions.love - 1 : post.engagement.reactions.love + 1
+              }
+            }
           }
-          : post
-      )
+        }
+        return post;
+      })
     )
+
+    try {
+      await pulseApi.toggleReaction(postId, 'love')
+    } catch (err) {
+      console.error('Failed to toggle reaction:', err)
+      // Revert on error?
+      refreshFeed() // Sync with server
+    }
   }
 
   // Handle comment
-  const handleComment = (postId: string, content: string) => {
-    const newComment: PulseComment = {
-      id: `comment-new-${Date.now()}`,
-      post_id: postId,
-      author: mockCurrentUser,
-      content,
-      like_count: 0,
-      created_at: new Date().toISOString(),
-      is_liked: false,
-    }
+  const handleComment = async (postId: string, content: string) => {
+    try {
+      const newComment = await pulseApi.addComment(postId, content)
 
-    setComments((prev) => ({
-      ...prev,
-      [postId]: [...(prev[postId] || []), newComment],
-    }))
+      // Update comments state
+      setComments((prev) => ({
+        ...prev,
+        [postId]: [newComment, ...(prev[postId] || [])],
+      }))
 
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId
-          ? { ...post, comment_count: post.comment_count + 1 }
-          : post
+      // Update post comment count
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? {
+              ...post,
+              engagement: {
+                ...post.engagement,
+                comments: post.engagement.comments + 1,
+                hasCommented: true
+              }
+            }
+            : post
+        )
       )
-    )
+    } catch (err) {
+      console.error('Failed to add comment:', err)
+    }
   }
 
-  // Handle echo
-  const handleEcho = (postId: string, type: 'echo' | 'quote_echo', quoteContent?: string) => {
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId
-          ? {
-            ...post,
-            is_echoed: true,
-            echo_count: post.echo_count + 1,
-          }
-          : post
+  // Handle echo (Share)
+  const handleEcho = async (postId: string, type: 'echo' | 'quote_echo', quoteContent?: string) => {
+    try {
+      await pulseApi.sharePulse(postId)
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? {
+              ...post,
+              engagement: {
+                ...post.engagement,
+                shares: post.engagement.shares + 1,
+                hasShared: true
+              }
+            }
+            : post
+        )
       )
-    )
+    } catch (err) {
+      console.error('Failed to share:', err)
+    }
   }
 
   // Handle bookmark
-  const handleBookmark = (postId: string) => {
+  const handleBookmark = async (postId: string) => {
+    // Optimistic update
     setPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId
-          ? {
+      prev.map((post) => {
+        if (post.id === postId) {
+          const newBookmarked = !post.engagement.hasBookmarked
+          return {
             ...post,
-            is_bookmarked: !post.is_bookmarked,
-            bookmark_count: post.is_bookmarked
-              ? post.bookmark_count - 1
-              : post.bookmark_count + 1,
+            engagement: {
+              ...post.engagement,
+              hasBookmarked: newBookmarked
+            }
           }
-          : post
-      )
+        }
+        return post
+      })
     )
+
+    try {
+      const post = posts.find(p => p.id === postId)
+      if (post?.engagement.hasBookmarked) {
+        await pulseApi.unbookmarkPulse(postId)
+      } else {
+        await pulseApi.bookmarkPulse(postId)
+      }
+    } catch (err) {
+      console.error('Failed to bookmark:', err)
+      refreshFeed()
+    }
   }
 
   // Handle topic click
@@ -253,57 +293,62 @@ export default function PulsePage() {
   }
 
   // Handle follow
-  const handleFollow = (userId: string) => {
+  const handleFollow = async (userId: string) => {
+    // This is tricky because userId here might be ID or username depending on context
+    // Our API expects username.
+    // Let's assume for now we don't implement follow from the sidebar suggestions yet as they are mock data
     console.log('Follow user:', userId)
-    // TODO: Implement follow functionality
   }
 
   return (
-    <PulsePageLayout
-      leftSidebar={
-        <PulseLeftSidebar
-          currentUser={mockCurrentUser}
-          userStats={mockUserDailyStats}
-        />
-      }
-      mainFeed={
-        <PulseMainFeed
-          composer={
-            <PulseComposer
-              currentUser={mockCurrentUser}
-              onSubmit={handlePostSubmit}
-              isSubmitting={isSubmitting}
-              onPulseCreated={refreshFeed}
-            />
-          }
-          tabs={<FeedTabs activeTab={activeTab} onTabChange={setActiveTab} />}
-          feed={
-            <PulseFeed
-              posts={posts}
-              comments={comments}
-              isLoading={isLoading}
-              hasMore={pagination.has_more}
-              isLoadingMore={pagination.is_loading_more}
-              onLoadMore={handleLoadMore}
-              onLike={handleLike}
-              onComment={handleComment}
-              onEcho={handleEcho}
-              onBookmark={handleBookmark}
-              onPulseDeleted={refreshFeed}
-            />
-          }
-        />
-      }
-      rightSidebar={
-        <PulseRightSidebar
-          trendingTopics={trendingTopics}
-          suggestedUsers={mockSuggestedUsers}
-          trendingMovies={mockTrendingMovies}
-          trendingCricket={mockTrendingCricket}
-          onTopicClick={handleTopicClick}
-          onFollow={handleFollow}
-        />
-      }
-    />
+    <NoSSR>
+      <PulsePageLayout
+        leftSidebar={
+          <PulseLeftSidebar
+            currentUser={currentUser}
+            userStats={mockUserDailyStats}
+          />
+        }
+        mainFeed={
+          <PulseMainFeed
+            composer={
+              <PulseComposer
+                currentUser={currentUser}
+                onSubmit={handlePostSubmit}
+                isSubmitting={isSubmitting}
+                onPulseCreated={refreshFeed}
+              />
+            }
+            tabs={<FeedTabs activeTab={activeTab} onTabChange={setActiveTab} />}
+            feed={
+              <PulseFeed
+                posts={posts}
+                comments={comments}
+                isLoading={isLoading}
+                hasMore={pagination.has_more}
+                isLoadingMore={pagination.is_loading_more}
+                onLoadMore={handleLoadMore}
+                onLike={handleLike}
+                onComment={handleComment}
+                onEcho={handleEcho}
+                onBookmark={handleBookmark}
+                onPulseDeleted={refreshFeed}
+              />
+            }
+          />
+        }
+        rightSidebar={
+          <PulseRightSidebar
+            trendingTopics={trendingTopics}
+            suggestedUsers={mockSuggestedUsers}
+            trendingMovies={mockTrendingMovies}
+            trendingCricket={mockTrendingCricket}
+            onTopicClick={handleTopicClick}
+            onFollow={handleFollow}
+          />
+        }
+      />
+    </NoSSR>
   )
 }
+

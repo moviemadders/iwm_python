@@ -1,0 +1,100 @@
+/**
+ * Tailwind Custom Styles for Review Card V2
+ * 
+ * Modern, premium styling for review cards with GIF showcase
+ */
+
+/* Custom scrollbar for review content */
+.review-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.review-content::-webkit-scrollbar-track {
+  background: #1E1E1E;
+  border-radius: 4px;
+}
+
+.review-content::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 4px;
+}
+
+.review-content::-webkit-scrollbar-thumb:hover {
+  background: #00D4FF;
+}
+
+/* Shimmer animation for GIF loading skeleton */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.skeleton-shimmer {
+  animation: shimmer 2s infinite linear;
+  background: linear-gradient(
+    to right,
+    #1E1E1E 0%,
+    #2A2A2A 20%,
+    #1E1E1E 40%,
+    #1E1E1E 100%
+  );
+  background-size: 1000px 100%;
+}
+
+/* Gradient text for special elements */
+.gradient-text {
+  background: linear-gradient(135deg, #00D4FF 0%, #0099FF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow effect for buttons */
+.glow-on-hover {
+  position: relative;
+  overflow: hidden;
+}
+
+.glow-on-hover::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 212, 255, 0.3), transparent);
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s;
+}
+
+.glow-on-hover:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* Custom focus styles for accessibility */
+.review-card-v2:focus-visible {
+  outline: 2px solid #00D4FF;
+  outline-offset: 4px;
+}
+
+/* Responsive typography */
+@media (max-width: 640px) {
+  .review-card-v2 {
+    font-size: 14px;
+  }
+  
+  .review-card-v2 .user-name {
+    font-size: 16px;
+  }
+  
+  .review-card-v2 .review-content {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+}

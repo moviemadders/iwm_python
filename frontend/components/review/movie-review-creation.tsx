@@ -13,6 +13,8 @@ import { useToast } from "@/hooks/use-toast"
 import { submitReview } from "@/lib/api/reviews"
 import { getCurrentUser } from "@/lib/auth"
 import { useRouter } from "next/navigation"
+import { GifPicker } from "./gif-picker"
+import { GifDisplay } from "./gif-display"
 
 interface MovieReviewCreationProps {
   movie: any
@@ -30,6 +32,8 @@ export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false
   const [uploadedMedia, setUploadedMedia] = useState<File[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDraft, setIsDraft] = useState(false)
+  const [selectedGif, setSelectedGif] = useState<string | null>(null)
+  const [isGifPickerOpen, setIsGifPickerOpen] = useState(false)
 
   const isVerified = true // Mock verification status
 
@@ -80,9 +84,10 @@ export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false
         content: reviewText,
         rating: rating,
         hasSpoilers: containsSpoilers,
+        gifUrl: selectedGif,
       }
 
-      const result = await submitReview(movie.id, reviewData, user.username)
+      const result = await submitReview(movie.id, reviewData, user.id)
 
       console.log("Review submitted successfully:", result)
 
@@ -179,6 +184,13 @@ export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false
           <ReviewEditor value={reviewText} onChange={setReviewText} movieTitle={movie.title} />
         </motion.div>
 
+        {/* GIF Display */}
+        {selectedGif && (
+          <motion.div variants={itemVariants}>
+            <GifDisplay gifUrl={selectedGif} onRemove={() => setSelectedGif(null)} />
+          </motion.div>
+        )}
+
         <motion.div variants={itemVariants}>
           <ReviewMetadata
             containsSpoilers={containsSpoilers}
@@ -189,7 +201,11 @@ export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false
         </motion.div>
 
         <motion.div variants={itemVariants}>
-          <MediaUploader files={uploadedMedia} onFilesChange={setUploadedMedia} />
+          <MediaUploader
+            files={uploadedMedia}
+            onFilesChange={setUploadedMedia}
+            onOpenGifPicker={() => setIsGifPickerOpen(true)}
+          />
         </motion.div>
 
         <motion.div variants={itemVariants}>
@@ -208,6 +224,13 @@ export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false
           />
         </motion.div>
       </div>
+
+      {/* GIF Picker Modal */}
+      <GifPicker
+        isOpen={isGifPickerOpen}
+        onClose={() => setIsGifPickerOpen(false)}
+        onSelectGif={(gifUrl) => setSelectedGif(gifUrl)}
+      />
     </motion.div>
   )
 }

@@ -69,6 +69,7 @@ export interface UserReview {
   comment_count: number
   created_at: string
   user_vote?: 'helpful' | 'unhelpful' | null
+  gif_url?: string | null
 }
 
 // ============================================================================

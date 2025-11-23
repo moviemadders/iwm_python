@@ -1,6 +1,7 @@
 """Critic Hub - Critic Reviews Repository"""
 from typing import List, Optional
 from sqlalchemy import select, update, delete, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 import uuid
@@ -97,21 +98,27 @@ class CriticReviewRepository:
     async def get_review_by_id(self, review_id: int) -> Optional[CriticReview]:
         """Get review by ID"""
         result = await self.db.execute(
-            select(CriticReview).where(CriticReview.id == review_id)
+            select(CriticReview)
+            .where(CriticReview.id == review_id)
+            .options(selectinload(CriticReview.critic), selectinload(CriticReview.movie))
         )
         return result.scalar_one_or_none()
 
     async def get_review_by_external_id(self, external_id: str) -> Optional[CriticReview]:
         """Get review by external ID"""
         result = await self.db.execute(
-            select(CriticReview).where(CriticReview.external_id == external_id)
+            select(CriticReview)
+            .where(CriticReview.external_id == external_id)
+            .options(selectinload(CriticReview.critic), selectinload(CriticReview.movie))
         )
         return result.scalar_one_or_none()
 
     async def get_review_by_slug(self, slug: str) -> Optional[CriticReview]:
         """Get review by slug"""
         result = await self.db.execute(
-            select(CriticReview).where(CriticReview.slug == slug)
+            select(CriticReview)
+            .where(CriticReview.slug == slug)
+            .options(selectinload(CriticReview.critic), selectinload(CriticReview.movie))
         )
         return result.scalar_one_or_none()
 
@@ -155,7 +162,11 @@ class CriticReviewRepository:
         offset: int = 0
     ) -> List[CriticReview]:
         """List reviews by critic"""
-        query = select(CriticReview).where(CriticReview.critic_id == critic_id)
+        query = (
+            select(CriticReview)
+            .where(CriticReview.critic_id == critic_id)
+            .options(selectinload(CriticReview.critic), selectinload(CriticReview.movie))
+        )
         
         if not include_drafts:
             query = query.where(CriticReview.is_draft == False)
@@ -171,10 +182,18 @@ class CriticReviewRepository:
         offset: int = 0
     ) -> List[CriticReview]:
         """List reviews for a movie"""
-        query = select(CriticReview).where(
-            (CriticReview.movie_id == movie_id) &
-            (CriticReview.is_draft == False)
-        ).order_by(CriticReview.published_at.desc()).limit(limit).offset(offset)
+        """List reviews for a movie"""
+        query = (
+            select(CriticReview)
+            .where(
+                (CriticReview.movie_id == movie_id) &
+                (CriticReview.is_draft == False)
+            )
+            .options(selectinload(CriticReview.critic), selectinload(CriticReview.movie))
+            .order_by(CriticReview.published_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
         
         result = await self.db.execute(query)
         return list(result.scalars().all())

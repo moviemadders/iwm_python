@@ -14,6 +14,7 @@ export interface ReviewSubmitData {
   content: string
   rating: number
   hasSpoilers?: boolean
+  gifUrl?: string | null
 }
 
 export interface ReviewUpdateData {
@@ -21,6 +22,7 @@ export interface ReviewUpdateData {
   content?: string
   rating?: number
   hasSpoilers?: boolean
+  gifUrl?: string | null
 }
 
 function getAuthHeaders(): HeadersInit {
@@ -75,6 +77,7 @@ export async function submitReview(movieId: string, reviewData: ReviewSubmitData
         content: reviewData.content,
         rating: reviewData.rating,
         spoilers: reviewData.hasSpoilers || false,
+        gifUrl: reviewData.gifUrl || null,
       }),
     })
 

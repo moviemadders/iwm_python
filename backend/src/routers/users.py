@@ -171,17 +171,105 @@ async def get_user_stats_internal(user_id: int, session: AsyncSession) -> UserSt
     favorites_result = await session.execute(favorites_query)
     favorites_count = favorites_result.scalar() or 0
     
+    
     # Count collections
     collections_query = select(func.count(Collection.id)).where(Collection.user_id == user_id)
     collections_result = await session.execute(collections_query)
     collections_count = collections_result.scalar() or 0
+    
+    # Get follow stats using PulseRepository
+    # We need to import PulseRepository inside function to avoid circular import if it was at top level
+    # But since we are in a function, it's fine. 
+    # Actually, let's just use the queries directly here or import PulseRepository.
+    # Since PulseRepository is in a different module, we should import it at top level or locally.
+    from ..repositories.pulse import PulseRepository
+    repo = PulseRepository(session)
+    following_count = await repo.get_following_count(user_id)
+    followers_count = await repo.get_follower_count(user_id)
     
     return UserStatsResponse(
         reviews=reviews_count,
         watchlist=watchlist_count,
         favorites=favorites_count,
         collections=collections_count,
-        following=0,  # TODO: Implement following/followers
-        followers=0,
+        following=following_count,
+        followers=followers_count,
     )
+
+
+@router.post("/{username}/follow")
+async def follow_user(
+    username: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user_optional),
+) -> Any:
+    """Follow a user"""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    # Find user to follow
+    query = select(User).where(User.username == username)
+    result = await session.execute(query)
+    target_user = result.scalar_one_or_none()
+    
+    # Try email prefix if not found
+    if not target_user:
+        query = select(User).where(User.email.like(f"{username}@%")).limit(1)
+        result = await session.execute(query)
+        target_user = result.scalar_one_or_none()
+        
+    # Try external_id
+    if not target_user:
+        query = select(User).where(User.external_id == username)
+        result = await session.execute(query)
+        target_user = result.scalar_one_or_none()
+
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    from ..repositories.pulse import PulseRepository
+    repo = PulseRepository(session)
+    try:
+        await repo.follow_user(current_user.id, target_user.id)
+        await session.commit()
+        return {"following": True}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.delete("/{username}/follow")
+async def unfollow_user(
+    username: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user_optional),
+) -> Any:
+    """Unfollow a user"""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    # Find user to unfollow
+    query = select(User).where(User.username == username)
+    result = await session.execute(query)
+    target_user = result.scalar_one_or_none()
+    
+    # Try email prefix
+    if not target_user:
+        query = select(User).where(User.email.like(f"{username}@%")).limit(1)
+        result = await session.execute(query)
+        target_user = result.scalar_one_or_none()
+        
+    # Try external_id
+    if not target_user:
+        query = select(User).where(User.external_id == username)
+        result = await session.execute(query)
+        target_user = result.scalar_one_or_none()
+
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    from ..repositories.pulse import PulseRepository
+    repo = PulseRepository(session)
+    await repo.unfollow_user(current_user.id, target_user.id)
+    await session.commit()
+    return {"following": False}
 

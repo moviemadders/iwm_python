@@ -441,3 +441,113 @@ class PulseRepository:
             }
             for c in comments
         ]
+
+    async def follow_user(self, follower_id: int, following_id: int) -> bool:
+        """Follow a user"""
+        if follower_id == following_id:
+            raise ValueError("Cannot follow yourself")
+
+        # Check if already following
+        q = select(UserFollow).where(
+            UserFollow.follower_id == follower_id,
+            UserFollow.following_id == following_id
+        )
+        existing = (await self.session.execute(q)).scalar_one_or_none()
+        if existing:
+            return True
+
+        # Create follow
+        follow = UserFollow(follower_id=follower_id, following_id=following_id)
+        self.session.add(follow)
+        await self.session.flush()
+        return True
+
+    async def unfollow_user(self, follower_id: int, following_id: int) -> bool:
+        """Unfollow a user"""
+        q = select(UserFollow).where(
+            UserFollow.follower_id == follower_id,
+            UserFollow.following_id == following_id
+        )
+        existing = (await self.session.execute(q)).scalar_one_or_none()
+        if not existing:
+            return False
+
+        await self.session.delete(existing)
+        await self.session.flush()
+        return True
+
+    async def is_following(self, follower_id: int, following_id: int) -> bool:
+        """Check if user is following another user"""
+        q = select(UserFollow).where(
+            UserFollow.follower_id == follower_id,
+            UserFollow.following_id == following_id
+        )
+        existing = (await self.session.execute(q)).scalar_one_or_none()
+        return existing is not None
+
+    async def get_follower_count(self, user_id: int) -> int:
+        """Get number of followers"""
+        q = select(func.count(UserFollow.id)).where(UserFollow.following_id == user_id)
+        return (await self.session.execute(q)).scalar() or 0
+
+    async def get_following_count(self, user_id: int) -> int:
+        """Get number of following"""
+        q = select(func.count(UserFollow.id)).where(UserFollow.follower_id == user_id)
+        return (await self.session.execute(q)).scalar() or 0
+
+    async def bookmark_pulse(self, user_id: int, pulse_id: str) -> bool:
+        """Bookmark a pulse"""
+        # Get pulse
+        q = select(Pulse).where(Pulse.external_id == pulse_id)
+        pulse = (await self.session.execute(q)).scalar_one_or_none()
+        if not pulse:
+            raise ValueError("Pulse not found")
+
+        # Check existing
+        from ..models import PulseBookmark
+        q_bookmark = select(PulseBookmark).where(
+            PulseBookmark.user_id == user_id,
+            PulseBookmark.pulse_id == pulse.id
+        )
+        existing = (await self.session.execute(q_bookmark)).scalar_one_or_none()
+        if existing:
+            return True
+
+        # Create bookmark
+        bookmark = PulseBookmark(user_id=user_id, pulse_id=pulse.id)
+        self.session.add(bookmark)
+        await self.session.flush()
+        return True
+
+    async def unbookmark_pulse(self, user_id: int, pulse_id: str) -> bool:
+        """Unbookmark a pulse"""
+        # Get pulse
+        q = select(Pulse).where(Pulse.external_id == pulse_id)
+        pulse = (await self.session.execute(q)).scalar_one_or_none()
+        if not pulse:
+            raise ValueError("Pulse not found")
+
+        from ..models import PulseBookmark
+        q_bookmark = select(PulseBookmark).where(
+            PulseBookmark.user_id == user_id,
+            PulseBookmark.pulse_id == pulse.id
+        )
+        existing = (await self.session.execute(q_bookmark)).scalar_one_or_none()
+        if not existing:
+            return False
+
+        await self.session.delete(existing)
+        await self.session.flush()
+        return True
+
+    async def share_pulse(self, pulse_id: str) -> int:
+        """Increment share count"""
+        # Get pulse
+        q = select(Pulse).where(Pulse.external_id == pulse_id)
+        pulse = (await self.session.execute(q)).scalar_one_or_none()
+        if not pulse:
+            raise ValueError("Pulse not found")
+
+        pulse.shares_count += 1
+        await self.session.flush()
+        return pulse.shares_count

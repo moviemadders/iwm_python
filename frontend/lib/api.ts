@@ -1320,3 +1320,141 @@ export async function getAwardDetails(ceremonyIdWithYear: string): Promise<Award
   }
   return null
 }
+
+function getAuthHeaders(): Record<string, string> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+export const pulseApi = {
+  getPulseFeed: async (params: {
+    filter?: "latest" | "popular" | "following" | "trending"
+    window?: "24h" | "7d" | "30d"
+    page?: number
+    limit?: number
+    hashtag?: string
+  }) => {
+    const query = new URLSearchParams({
+      filter: params.filter || "latest",
+      window: params.window || "7d",
+      page: (params.page || 1).toString(),
+      limit: (params.limit || 20).toString(),
+    })
+    if (params.hashtag) query.append("hashtag", params.hashtag)
+
+    const res = await fetch(`${getApiUrl()}/api/v1/pulse/feed?${query.toString()}`, {
+      headers: getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error("Failed to fetch feed")
+    return res.json()
+  },
+
+  createPulse: async (data: {
+    contentText: string
+    contentMedia?: string[]
+    linkedMovieId?: string
+    hashtags?: string[]
+  }) => {
+    const res = await fetch(`${getApiUrl()}/api/v1/pulse`, {
+      method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error("Failed to create pulse")
+    return res.json()
+  },
+
+  deletePulse: async (id: string) => {
+    const res = await fetch(`${getApiUrl()}/api/v1/pulse/${id}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error("Failed to delete pulse")
+    return res.json()
+  },
+
+  toggleReaction: async (id: string, type: string) => {
+    const res = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/reactions`, {
+      method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ type }),
+    })
+    if (!res.ok) throw new Error("Failed to toggle reaction")
+    return res.json()
+  },
+
+  addComment: async (id: string, content: string) => {
+    const res = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/comments`, {
+      method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ content }),
+    })
+    if (!res.ok) throw new Error("Failed to add comment")
+    return res.json()
+  },
+
+  getComments: async (id: string, page = 1, limit = 20) => {
+    const res = await fetch(
+      `${getApiUrl()}/api/v1/pulse/${id}/comments?page=${page}&limit=${limit}`,
+      {
+        headers: getAuthHeaders(),
+      }
+    )
+    if (!res.ok) throw new Error("Failed to get comments")
+    return res.json()
+  },
+
+  bookmarkPulse: async (id: string) => {
+    const res = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/bookmark`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error("Failed to bookmark pulse")
+    return res.json()
+  },
+
+  unbookmarkPulse: async (id: string) => {
+    const res = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/bookmark`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error("Failed to unbookmark pulse")
+    return res.json()
+  },
+
+  sharePulse: async (id: string) => {
+    const res = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/share`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error("Failed to share pulse")
+    return res.json()
+  },
+
+  followUser: async (username: string) => {
+    const res = await fetch(`${getApiUrl()}/api/v1/users/${username}/follow`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error("Failed to follow user")
+    return res.json()
+  },
+
+  unfollowUser: async (username: string) => {
+    const res = await fetch(`${getApiUrl()}/api/v1/users/${username}/follow`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error("Failed to unfollow user")
+    return res.json()
+  },
+}

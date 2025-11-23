@@ -378,19 +378,25 @@ async def list_reviews_by_movie(
 
     # Try to parse as int first (internal ID)
     try:
-        movie_id_int = int(movie_id)
-        reviews = await review_repo.list_reviews_by_movie(movie_id_int, limit=limit, offset=offset)
-    except ValueError:
-        # Try to lookup by external_id
-        movie = await movie_repo.get_movie_by_external_id(movie_id)
-        if not movie:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Movie not found: {movie_id}"
-            )
-        reviews = await review_repo.list_reviews_by_movie(movie.id, limit=limit, offset=offset)
+        try:
+            movie_id_int = int(movie_id)
+            reviews = await review_repo.list_reviews_by_movie(movie_id_int, limit=limit, offset=offset)
+        except ValueError:
+            # Try to lookup by external_id
+            movie = await movie_repo.get_movie_by_external_id(movie_id)
+            if not movie:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Movie not found: {movie_id}"
+                )
+            reviews = await review_repo.list_reviews_by_movie(movie.id, limit=limit, offset=offset)
 
-    return [_review_to_response(review) for review in reviews]
+        return [_review_to_response(review) for review in reviews]
+    except Exception as e:
+        import traceback
+        with open("backend_error.log", "w") as f:
+            f.write(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/{review_id}/like")

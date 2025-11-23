@@ -58,6 +58,7 @@ class ReviewRepository:
                 "commentCount": r.comment_count,
                 "engagementScore": r.engagement_score,
                 "mediaUrls": r.media_urls.split(",") if r.media_urls else [],
+                "gifUrl": r.gif_url,
                 "author": {
                     "id": r.author.external_id,
                     "name": r.author.name,
@@ -104,6 +105,7 @@ class ReviewRepository:
             "commentCount": r.comment_count,
             "engagementScore": r.engagement_score,
             "mediaUrls": r.media_urls.split(",") if r.media_urls else [],
+            "gifUrl": r.gif_url,
             "reviewer": {
                 "id": r.author.external_id,
                 "username": r.author.name,
@@ -139,6 +141,7 @@ class ReviewRepository:
         content: str,
         title: Optional[str] = None,
         spoilers: bool = False,
+        gif_url: Optional[str] = None,
     ) -> dict[str, Any]:
         """Create a new review"""
         if not self.session:
@@ -174,6 +177,7 @@ class ReviewRepository:
             unhelpful_votes=0,
             comment_count=0,
             engagement_score=0,
+            gif_url=gif_url,
         )
         self.session.add(review)
         await self.session.flush()
@@ -204,6 +208,7 @@ class ReviewRepository:
         content: Optional[str] = None,
         rating: Optional[float] = None,
         has_spoilers: Optional[bool] = None,
+        gif_url: Optional[str] = None,
     ) -> dict[str, Any] | None:
         """Update an existing review"""
         if not self.session:
@@ -231,6 +236,8 @@ class ReviewRepository:
             review.rating = rating
         if has_spoilers is not None:
             review.has_spoilers = has_spoilers
+        if gif_url is not None:
+            review.gif_url = gif_url
 
         await self.session.flush()
 

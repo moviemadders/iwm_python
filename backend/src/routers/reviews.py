@@ -20,6 +20,7 @@ class ReviewIn(BaseModel):
     title: Optional[str] = None
     content: str
     spoilers: bool = False
+    gifUrl: Optional[str] = None
 
 
 class ReviewUpdateBody(BaseModel):
@@ -27,6 +28,7 @@ class ReviewUpdateBody(BaseModel):
     content: Optional[str] = None
     rating: Optional[float] = None
     hasSpoilers: Optional[bool] = None
+    gifUrl: Optional[str] = None
 
 
 @router.get("")
@@ -74,6 +76,7 @@ async def create_review(body: ReviewIn, session: AsyncSession = Depends(get_sess
             title=body.title,
             content=body.content,
             spoilers=body.spoilers,
+            gif_url=body.gifUrl,
         )
         await session.commit()
         return result
@@ -102,6 +105,7 @@ async def update_review(
             content=body.content,
             rating=body.rating,
             has_spoilers=body.hasSpoilers,
+            gif_url=body.gifUrl,
         )
         if not result:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")

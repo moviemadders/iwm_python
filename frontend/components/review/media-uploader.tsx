@@ -2,15 +2,16 @@
 
 import { useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Upload, X } from "lucide-react"
+import { Upload, X, Sparkles } from "lucide-react"
 import { useDropzone } from "react-dropzone"
 
 interface MediaUploaderProps {
   files: File[]
   onFilesChange: (files: File[]) => void
+  onOpenGifPicker?: () => void
 }
 
-export function MediaUploader({ files, onFilesChange }: MediaUploaderProps) {
+export function MediaUploader({ files, onFilesChange, onOpenGifPicker }: MediaUploaderProps) {
   const [previews, setPreviews] = useState<string[]>([])
 
   const onDrop = useCallback(
@@ -47,15 +48,26 @@ export function MediaUploader({ files, onFilesChange }: MediaUploaderProps) {
     <div className="space-y-2">
       <label className="text-sm font-medium text-siddu-text-light">Add Media (Optional)</label>
 
+      {/* GIF Picker Button - MOVED TO TOP */}
+      {onOpenGifPicker && (
+        <button
+          type="button"
+          onClick={onOpenGifPicker}
+          className="w-full py-3 px-4 border-2 border-siddu-electric-blue rounded-lg hover:bg-siddu-electric-blue/10 transition-all flex items-center justify-center gap-2 text-siddu-electric-blue font-semibold"
+        >
+          <Sparkles className="w-5 h-5" />
+          <span>Search GIFs</span>
+        </button>
+      )}
+
       <div
         {...getRootProps()}
         className={`
           border-2 border-dashed rounded-lg p-6 text-center cursor-pointer
           transition-all duration-200
-          ${
-            isDragActive
-              ? "border-siddu-electric-blue bg-siddu-electric-blue/10"
-              : "border-siddu-border-subtle hover:border-siddu-electric-blue/50"
+          ${isDragActive
+            ? "border-siddu-electric-blue bg-siddu-electric-blue/10"
+            : "border-siddu-border-subtle hover:border-siddu-electric-blue/50"
           }
         `}
       >
@@ -64,9 +76,9 @@ export function MediaUploader({ files, onFilesChange }: MediaUploaderProps) {
         {files.length === 0 ? (
           <div className="space-y-2">
             <Upload className="w-8 h-8 mx-auto text-siddu-text-subtle" />
-            <p className="text-siddu-text-light">Add images or GIFs to your review</p>
+            <p className="text-siddu-text-light">Add images to your review</p>
             <p className="text-sm text-siddu-text-subtle">Drag & drop or click to browse</p>
-            <p className="text-xs text-siddu-text-subtle">JPG, PNG, GIF • Max 2 files • 5MB per image, 10MB for GIFs</p>
+            <p className="text-xs text-siddu-text-subtle">JPG, PNG • Max 2 files • 5MB per image</p>
           </div>
         ) : (
           <div className="flex gap-4 justify-center flex-wrap">

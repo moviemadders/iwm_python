@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from ..db import get_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..repositories.pulse import PulseRepository
-from ..dependencies.auth import get_current_user
+from ..dependencies.auth import get_current_user, get_current_user_optional
 from ..models import User
 
 router = APIRouter(prefix="/pulse", tags=["pulse"])
@@ -30,7 +30,12 @@ async def get_feed(
     viewerId: Optional[str] = Query(None),
     hashtag: Optional[str] = Query(None),
     session: AsyncSession = Depends(get_session),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
+    # If viewerId is not provided but user is authenticated, use their ID
+    if not viewerId and current_user:
+        viewerId = current_user.external_id
+
     repo = PulseRepository(session)
     return await repo.list_feed(
         filter_type=filter,
@@ -170,3 +175,63 @@ async def get_comments(
     """Get comments for a pulse"""
     repo = PulseRepository(session)
     return await repo.get_comments(pulse_id=pulse_id, page=page, limit=limit)
+
+
+@router.post("/{pulse_id}/bookmark")
+async def bookmark_pulse(
+    pulse_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Bookmark a pulse"""
+    repo = PulseRepository(session)
+    try:
+        await repo.bookmark_pulse(user_id=current_user.id, pulse_id=pulse_id)
+        await session.commit()
+        return {"bookmarked": True}
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to bookmark pulse: {str(e)}")
+
+
+@router.delete("/{pulse_id}/bookmark")
+async def unbookmark_pulse(
+    pulse_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Unbookmark a pulse"""
+    repo = PulseRepository(session)
+    try:
+        await repo.unbookmark_pulse(user_id=current_user.id, pulse_id=pulse_id)
+        await session.commit()
+        return {"bookmarked": False}
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to unbookmark pulse")
+
+
+@router.post("/{pulse_id}/share")
+async def share_pulse(
+    pulse_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Share a pulse (increment share count)"""
+    repo = PulseRepository(session)
+    try:
+        count = await repo.share_pulse(pulse_id=pulse_id)
+        await session.commit()
+        return {"shared": True, "shares_count": count}
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to share pulse")

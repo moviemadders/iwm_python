@@ -104,9 +104,8 @@ export default function UserReviewCard({
     return Array.from({ length: 5 }, (_, i) => (
       <Star
         key={i}
-        className={`w-4 h-4 ${
-          i < rating ? "text-[#FFD700] fill-[#FFD700]" : "text-[#3A3A3A]"
-        }`}
+        className={`w-4 h-4 ${i < rating ? "text-[#FFD700] fill-[#FFD700]" : "text-[#3A3A3A]"
+          }`}
       />
     ))
   }
@@ -116,9 +115,8 @@ export default function UserReviewCard({
 
   return (
     <div
-      className={`bg-[#282828] rounded-lg border ${
-        isCurrentUser ? "border-[#00BFFF] shadow-[0_0_15px_rgba(0,191,255,0.2)]" : "border-[#3A3A3A]"
-      } p-6 transition-all duration-200`}
+      className={`bg-[#282828] rounded-lg border ${isCurrentUser ? "border-[#00BFFF] shadow-[0_0_15px_rgba(0,191,255,0.2)]" : "border-[#3A3A3A]"
+        } p-6 transition-all duration-200`}
     >
       {/* User Info & Rating */}
       <div className="flex items-start justify-between mb-4">
@@ -148,6 +146,20 @@ export default function UserReviewCard({
 
         <div className="flex items-center gap-1">{renderStars(review.rating)}</div>
       </div>
+
+      {/* GIF Display - Show if review has a GIF */}
+      {review.gif_url && (
+        <div className="mb-4">
+          <div className="relative rounded-lg overflow-hidden bg-[#1A1A1A] border border-[#3A3A3A]">
+            <img
+              src={review.gif_url}
+              alt="Review GIF"
+              className="w-full max-h-80 object-contain"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Spoiler Warning */}
       {review.contains_spoilers && !isSpoilerRevealed && (
@@ -229,9 +241,8 @@ export default function UserReviewCard({
             {/* Helpful Button */}
             <button
               onClick={handleHelpfulClick}
-              className={`flex items-center gap-1 text-sm ${
-                userVote === "helpful" ? "text-[#10B981]" : "text-[#A0A0A0]"
-              } hover:text-[#10B981] transition-colors`}
+              className={`flex items-center gap-1 text-sm ${userVote === "helpful" ? "text-[#10B981]" : "text-[#A0A0A0]"
+                } hover:text-[#10B981] transition-colors`}
             >
               <ThumbsUp className="w-4 h-4" />
               <span>{helpfulCount}</span>
@@ -240,9 +251,8 @@ export default function UserReviewCard({
             {/* Unhelpful Button */}
             <button
               onClick={handleUnhelpfulClick}
-              className={`flex items-center gap-1 text-sm ${
-                userVote === "unhelpful" ? "text-[#EF4444]" : "text-[#A0A0A0]"
-              } hover:text-[#EF4444] transition-colors`}
+              className={`flex items-center gap-1 text-sm ${userVote === "unhelpful" ? "text-[#EF4444]" : "text-[#A0A0A0]"
+                } hover:text-[#EF4444] transition-colors`}
             >
               <ThumbsDown className="w-4 h-4" />
               <span>{unhelpfulCount}</span>
