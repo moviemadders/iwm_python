@@ -144,3 +144,187 @@ async def delete_review(
         await session.rollback()
         raise HTTPException(status_code=500, detail="Failed to delete review")
 
+
+@router.post("/{review_id}/vote")
+async def vote_on_review(
+    review_id: str,
+    vote_type: str,  # Query parameter: "helpful" or "unhelpful"
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Vote on a review (helpful or unhelpful)."""
+    from ..repositories.review_votes import ReviewVoteRepository
+    
+    if vote_type not in ["helpful", "unhelpful"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="vote_type must be 'helpful' or 'unhelpful'"
+        )
+    
+    repo = ReviewVoteRepository(session)
+    try:
+        result = await repo.create_or_update_vote(review_id, current_user.id, vote_type)
+        await session.commit()
+        return result
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to vote on review")
+
+
+@router.delete("/{review_id}/vote")
+async def remove_vote_from_review(
+    review_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Remove user's vote from a review."""
+    from ..repositories.review_votes import ReviewVoteRepository
+    
+    repo = ReviewVoteRepository(session)
+    try:
+        result = await repo.delete_vote(review_id, current_user.id)
+        if not result:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vote not found")
+        await session.commit()
+        return {"deleted": True}
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to remove vote")
+
+
+@router.get("/{review_id}/vote")
+async def get_user_vote_on_review(
+    review_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get the current user's vote on a review."""
+    from ..repositories.review_votes import ReviewVoteRepository
+    
+    repo = ReviewVoteRepository(session)
+    result = await repo.get_user_vote(review_id, current_user.id)
+    if not result:
+        return {"voteType": None}
+    return result
+
+
+# Review Comments Endpoints
+
+class CommentCreateBody(BaseModel):
+    content: str
+    parentId: Optional[str] = None
+
+
+@router.post("/{review_id}/comments")
+async def create_comment(
+    review_id: str,
+    body: CommentCreateBody,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Create a comment on a review."""
+    from ..repositories.review_comments import ReviewCommentRepository
+    
+    repo = ReviewCommentRepository(session)
+    try:
+        result = await repo.create_comment(
+            review_id=review_id,
+            user_id=current_user.id,
+            content=body.content,
+            parent_id=body.parentId,
+        )
+        await session.commit()
+        return result
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        print(f"ERROR in create_comment endpoint: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create comment: {str(e)}")
+
+
+@router.get("/{review_id}/comments")
+async def list_comments(
+    review_id: str,
+    parentId: Optional[str] = None,
+    page: int = 1,
+    limit: int = 50,
+    session: AsyncSession = Depends(get_session),
+    current_user: Optional[User] = Depends(get_current_user),
+) -> Any:
+    """List comments for a review."""
+    from ..repositories.review_comments import ReviewCommentRepository
+    
+    repo = ReviewCommentRepository(session)
+    try:
+        result = await repo.list_comments(
+            review_id=review_id,
+            parent_id=parentId,
+            page=page,
+            limit=limit,
+        )
+        
+        # If user is authenticated, populate userHasLiked for each comment
+        if current_user:
+            for comment in result["comments"]:
+                has_liked = await repo.get_user_like(comment["id"], current_user.id)
+                comment["userHasLiked"] = has_liked or False
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to fetch comments")
+
+
+@router.post("/{review_id}/comments/{comment_id}/like")
+async def like_comment(
+    review_id: str,
+    comment_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Like a comment."""
+    from ..repositories.review_comments import ReviewCommentRepository
+    
+    repo = ReviewCommentRepository(session)
+    try:
+        result = await repo.like_comment(comment_id, current_user.id)
+        await session.commit()
+        return result
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to like comment")
+
+
+@router.delete("/{review_id}/comments/{comment_id}/like")
+async def unlike_comment(
+    review_id: str,
+    comment_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Unlike a comment."""
+    from ..repositories.review_comments import ReviewCommentRepository
+    
+    repo = ReviewCommentRepository(session)
+    try:
+        result = await repo.unlike_comment(comment_id, current_user.id)
+        await session.commit()
+        return result
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to unlike comment")
+
