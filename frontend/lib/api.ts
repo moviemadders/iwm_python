@@ -1322,7 +1322,7 @@ export async function getAwardDetails(ceremonyIdWithYear: string): Promise<Award
 }
 
 function getAuthHeaders(): Record<string, string> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
@@ -1333,6 +1333,7 @@ export const pulseApi = {
     page?: number
     limit?: number
     hashtag?: string
+    linkedType?: string
   }) => {
     const query = new URLSearchParams({
       filter: params.filter || "latest",
@@ -1341,6 +1342,7 @@ export const pulseApi = {
       limit: (params.limit || 20).toString(),
     })
     if (params.hashtag) query.append("hashtag", params.hashtag)
+    if (params.linkedType) query.append("linkedType", params.linkedType)
 
     const res = await fetch(`${getApiUrl()}/api/v1/pulse/feed?${query.toString()}`, {
       headers: getAuthHeaders(),
@@ -1349,11 +1351,25 @@ export const pulseApi = {
     return res.json()
   },
 
+  getTrendingTopics: async (window: "24h" | "7d" | "30d" = "7d", limit = 10) => {
+    const query = new URLSearchParams({
+      window,
+      limit: limit.toString(),
+    })
+    const res = await fetch(`${getApiUrl()}/api/v1/pulse/trending-topics?${query.toString()}`, {
+      headers: getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error("Failed to fetch trending topics")
+    return res.json()
+  },
+
   createPulse: async (data: {
     contentText: string
     contentMedia?: string[]
     linkedMovieId?: string
     hashtags?: string[]
+    postedAsRole?: string
+    starRating?: number
   }) => {
     const res = await fetch(`${getApiUrl()}/api/v1/pulse`, {
       method: "POST",
@@ -1455,6 +1471,29 @@ export const pulseApi = {
       headers: getAuthHeaders(),
     })
     if (!res.ok) throw new Error("Failed to unfollow user")
+    return res.json()
+  },
+
+  getSuggestedUsers: async (limit = 5) => {
+    const res = await fetch(`${getApiUrl()}/api/v1/users/suggested?limit=${limit}`, {
+      headers: getAuthHeaders(),
+    })
+    if (!res.ok) throw new Error("Failed to fetch suggested users")
+    return res.json()
+  },
+
+  uploadMedia: async (file: File) => {
+    const formData = new FormData()
+    formData.append("file", file)
+
+    const res = await fetch(`${getApiUrl()}/api/v1/upload/media`, {
+      method: "POST",
+      headers: {
+        Authorization: getAuthHeaders().Authorization || "",
+      },
+      body: formData,
+    })
+    if (!res.ok) throw new Error("Failed to upload media")
     return res.json()
   },
 }

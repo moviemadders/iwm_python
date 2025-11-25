@@ -3,26 +3,12 @@ from __future__ import annotations
 from typing import List
 from datetime import datetime
 from enum import Enum as PyEnum
-from sqlalchemy import String, ForeignKey, Integer, Table, Column, Text, Float, Boolean, DateTime, UniqueConstraint, TIMESTAMP, func
+from sqlalchemy import String, ForeignKey, Integer, Table, Column, Text, Float, Boolean, DateTime, UniqueConstraint, TIMESTAMP, func, Date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
 
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
-from sqlalchemy.types import JSON, TypeDecorator
-from .config import settings
-
-# Monkeypatch for SQLite
-if "sqlite" in (settings.database_url or ""):
-    class SQLiteArray(TypeDecorator):
-        impl = JSON
-        def process_bind_param(self, value, dialect):
-            return value
-        def process_result_value(self, value, dialect):
-            return value
-            
-    JSONB = JSON
-    ARRAY = SQLiteArray
 
 
 # Enums for multi-role profile system
@@ -268,6 +254,7 @@ class User(Base):
     role_profiles: Mapped[List["UserRoleProfile"]] = relationship(back_populates="user", cascade="all, delete-orphan", lazy="selectin")
     talent_profile: Mapped["TalentProfile | None"] = relationship(back_populates="user", uselist=False, lazy="selectin")
     industry_profile: Mapped["IndustryProfile | None"] = relationship(back_populates="user", uselist=False, lazy="selectin")
+    notifications: Mapped[List["UserNotification"]] = relationship("UserNotification", foreign_keys="UserNotification.user_id", back_populates="user", lazy="selectin", cascade="all, delete-orphan")
 
 
 class UserRoleProfile(Base):
@@ -372,6 +359,75 @@ class Review(Base):
 
     author: Mapped["User"] = relationship(back_populates="reviews", lazy="selectin")
     movie: Mapped["Movie"] = relationship(lazy="selectin")
+
+
+class ReviewVote(Base):
+    """
+    Tracks individual user votes on reviews (helpful/unhelpful).
+    Ensures one vote per user per review via unique constraint.
+    """
+    __tablename__ = "review_votes"
+    __table_args__ = (
+        UniqueConstraint("user_id", "review_id", name="uq_review_vote_user_review"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    external_id: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    vote_type: Mapped[str] = mapped_column(String(20))  # "helpful" or "unhelpful"
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, onupdate=datetime.utcnow)
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"))
+
+    user: Mapped["User"] = relationship(lazy="selectin")
+    review: Mapped["Review"] = relationship(lazy="selectin")
+
+
+class ReviewComment(Base):
+    """
+    Comments on user reviews. Supports nested replies via self-referential parent_id.
+    """
+    __tablename__ = "review_comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    external_id: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    likes_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Foreign Keys
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"))
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("review_comments.id"), nullable=True)
+
+    # Relationships
+    user: Mapped["User"] = relationship(lazy="selectin")
+    review: Mapped["Review"] = relationship(lazy="selectin")
+    parent: Mapped["ReviewComment | None"] = relationship(remote_side=[id], lazy="selectin")
+    replies: Mapped[List["ReviewComment"]] = relationship(back_populates="parent", cascade="all, delete-orphan", lazy="selectin")
+
+
+class ReviewCommentLike(Base):
+    """
+    Tracks likes on review comments. One like per user per comment.
+    """
+    __tablename__ = "review_comment_likes"
+    __table_args__ = (
+        UniqueConstraint("user_id", "comment_id", name="uq_review_comment_like_user_comment"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    external_id: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    comment_id: Mapped[int] = mapped_column(ForeignKey("review_comments.id"))
+
+    user: Mapped["User"] = relationship(lazy="selectin")
+    comment: Mapped["ReviewComment"] = relationship(lazy="selectin")
 
 
 class Collection(Base):
@@ -791,6 +847,11 @@ class Pulse(Base):
     linked_movie: Mapped["Movie | None"] = relationship(lazy="selectin")
 
     hashtags: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON array of strings
+
+    # Role-based posting fields
+    posted_as_role: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)  # 'critic', 'industry_pro', 'talent_pro', NULL
+    star_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 1-5 stars, only for pro roles with linked movies
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)  # Soft delete
 
     reactions_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON object with reaction counts
     reactions_total: Mapped[int] = mapped_column(Integer, default=0)
@@ -1574,3 +1635,128 @@ class FeatureFlag(Base):
             "feature_key": self.feature_key,
             "is_enabled": self.is_enabled,
         }
+
+
+# ============================================================================
+# NEW PULSE TABLES (Notifications, DMs, Stats)
+# ============================================================================
+
+class NotificationType(str, PyEnum):
+    FOLLOW = "follow"
+    LIKE = "like"
+    COMMENT = "comment"
+    MENTION = "mention"
+    SHARE = "share"
+
+class UserNotification(Base):
+    __tablename__ = "user_notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    external_id: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    type: Mapped[NotificationType] = mapped_column(String(20))
+    actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    pulse_id: Mapped[int | None] = mapped_column(ForeignKey("pulses.id"), nullable=True)
+    comment_id: Mapped[int | None] = mapped_column(ForeignKey("pulse_comments.id"), nullable=True)
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship("User", foreign_keys=[user_id], back_populates="notifications", lazy="selectin")
+    actor: Mapped["User"] = relationship("User", foreign_keys=[actor_id], lazy="selectin")
+    pulse: Mapped["Pulse | None"] = relationship("Pulse", lazy="selectin")
+    comment: Mapped["PulseComment | None"] = relationship("PulseComment", lazy="selectin")
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    external_id: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    last_message_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    participants: Mapped[List["ConversationParticipant"]] = relationship(back_populates="conversation", lazy="selectin", cascade="all, delete-orphan")
+    messages: Mapped[List["Message"]] = relationship(back_populates="conversation", lazy="selectin", cascade="all, delete-orphan")
+
+
+class ConversationParticipant(Base):
+    __tablename__ = "conversation_participants"
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "user_id", name="uq_conversation_participant"),
+    )
+
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_read_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    conversation: Mapped["Conversation"] = relationship(back_populates="participants", lazy="selectin")
+    user: Mapped["User"] = relationship("User", lazy="selectin")
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    external_id: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), index=True)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    content: Mapped[str] = mapped_column(Text)
+    media_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=datetime.utcnow, nullable=True)
+
+    conversation: Mapped["Conversation"] = relationship(back_populates="messages", lazy="selectin")
+    sender: Mapped["User"] = relationship("User", lazy="selectin")
+
+
+class UserDailyStats(Base):
+    __tablename__ = "user_daily_stats"
+    __table_args__ = (
+        UniqueConstraint("user_id", "date", name="uq_user_daily_stats"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    date: Mapped[datetime] = mapped_column(Date)
+    pulses_posted: Mapped[int] = mapped_column(Integer, default=0)
+    likes_received: Mapped[int] = mapped_column(Integer, default=0)
+    new_followers: Mapped[int] = mapped_column(Integer, default=0)
+    comments_received: Mapped[int] = mapped_column(Integer, default=0)
+
+    user: Mapped["User"] = relationship("User", lazy="selectin")
+
+
+class PulseCommentLike(Base):
+    __tablename__ = "pulse_comment_likes"
+    __table_args__ = (
+        UniqueConstraint("user_id", "comment_id", name="uq_pulse_comment_like"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    comment_id: Mapped[int] = mapped_column(ForeignKey("pulse_comments.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship("User", lazy="selectin")
+    comment: Mapped["PulseComment"] = relationship("PulseComment", lazy="selectin")
+
+
+class ShareType(str, PyEnum):
+    ECHO = "echo"
+    QUOTE_ECHO = "quote_echo"
+
+class PulseShare(Base):
+    __tablename__ = "pulse_shares"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    pulse_id: Mapped[int] = mapped_column(ForeignKey("pulses.id"))
+    share_type: Mapped[ShareType] = mapped_column(String(20))
+    quote_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship("User", lazy="selectin")
+    pulse: Mapped["Pulse"] = relationship("Pulse", lazy="selectin")

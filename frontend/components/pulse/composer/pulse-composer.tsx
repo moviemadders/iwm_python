@@ -19,6 +19,14 @@ import PostButton from './post-button'
 import { me } from '@/lib/auth'
 import { createPulse } from '@/lib/api/pulses'
 import { useToast } from '@/hooks/use-toast'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Star } from "lucide-react"
 
 interface PulseComposerProps {
   currentUser: CurrentUser
@@ -39,6 +47,8 @@ export default function PulseComposer({
   const [isExpanded, setIsExpanded] = useState(false)
   const [authUser, setAuthUser] = useState<any>(null)
   const [isPosting, setIsPosting] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<string>("")
+  const [starRating, setStarRating] = useState<number>(0)
   const { toast } = useToast()
 
   const MAX_CHARS = 280 // Changed from 500 to 280 as per requirements
@@ -80,6 +90,8 @@ export default function PulseComposer({
         contentMedia,
         linkedMovieId,
         hashtags,
+        postedAsRole: selectedRole || undefined,
+        starRating: (selectedRole && linkedMovieId && starRating > 0) ? starRating : undefined,
       })
 
       toast({
@@ -94,6 +106,8 @@ export default function PulseComposer({
       setContent('')
       setMedia([])
       setTaggedItems([])
+      setSelectedRole("")
+      setStarRating(0)
       setIsExpanded(false)
 
       // Notify parent to refresh feed
@@ -141,6 +155,19 @@ export default function PulseComposer({
       transition={{ duration: 0.4, delay: 0.3 }}
       className="bg-[#282828] border border-[#3A3A3A] rounded-xl p-6"
     >
+      <div className="flex justify-end mb-2">
+        <Select value={selectedRole} onValueChange={setSelectedRole}>
+          <SelectTrigger className="w-[140px] h-8 bg-[#1A1A1A] border-[#3A3A3A] text-xs">
+            <SelectValue placeholder="Post as..." />
+          </SelectTrigger>
+          <SelectContent className="bg-[#282828] border-[#3A3A3A] text-white">
+            <SelectItem value="personal">Personal</SelectItem>
+            <SelectItem value="critic">As Critic 🎬</SelectItem>
+            <SelectItem value="industry_pro">As Filmmaker 🎥</SelectItem>
+            <SelectItem value="talent_pro">As Talent 🌟</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <div className="flex gap-4">
         {/* Avatar */}
         <div className="flex-shrink-0">
@@ -185,6 +212,34 @@ export default function PulseComposer({
                     onRemove={() => handleTagRemove(tag.id)}
                   />
                 ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Star Rating Input */}
+          <AnimatePresence>
+            {taggedItems.some(t => t.type === 'movie') && selectedRole && selectedRole !== "personal" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-2 bg-[#1A1A1A] rounded-md p-3 border border-[#3A3A3A] flex items-center justify-between"
+              >
+                <span className="text-sm text-[#A0A0A0]">Rate this title:</span>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => setStarRating(star)}
+                      className="focus:outline-none transition-transform hover:scale-110"
+                    >
+                      <Star
+                        className={`h-6 w-6 ${star <= starRating ? "text-yellow-500 fill-yellow-500" : "text-[#3A3A3A]"
+                          }`}
+                      />
+                    </button>
+                  ))}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

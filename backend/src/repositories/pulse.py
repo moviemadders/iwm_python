@@ -65,6 +65,8 @@ class PulseRepository:
         limit: int = 20,
         viewer_external_id: Optional[str] = None,
         hashtag: Optional[str] = None,
+        linked_movie_id: Optional[str] = None,
+        linked_type: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         q = self._base_query()
 
@@ -89,6 +91,9 @@ class PulseRepository:
             func.jsonb_extract_path_text(UserSettings.privacy, 'profileVisibility') != 'private'
         )
 
+        # Filter out soft-deleted posts
+        q = q.where(Pulse.deleted_at.is_(None))
+
         if viewer_id:
             # If viewer is logged in, they can also see their own private posts
             q = q.where(or_(
@@ -108,6 +113,14 @@ class PulseRepository:
                 Pulse.content,
                 f'$.hashtags[*] ? (@ like_regex "{clean_hashtag}" flag "i")'
             ))
+
+        # Filter by linked movie ID
+        if linked_movie_id:
+            q = q.where(Pulse.linked_movie_id == linked_movie_id)
+        
+        # Filter by linked content type
+        if linked_type:
+            q = q.where(Pulse.linked_type == linked_type)
 
         # Window handling
         now = datetime.utcnow()
@@ -220,6 +233,9 @@ class PulseRepository:
                 "posterUrl": p.linked_poster_url,
             }
 
+        # Determine if user posted with verified role
+        is_verified = p.posted_as_role in ['critic', 'industry_pro', 'talent_pro'] if p.posted_as_role else False
+
         return {
             "id": p.external_id,
             "userId": user.external_id,
@@ -227,13 +243,15 @@ class PulseRepository:
                 "username": username,
                 "displayName": display_name,
                 "avatarUrl": avatar_url,
-                "isVerified": False,
+                "isVerified": is_verified,
+                "role": p.posted_as_role,  # 'critic', 'industry_pro', 'talent_pro', or None
             },
             "content": {
                 "text": p.content_text,
                 "media": media if media else None,
                 "linkedContent": linked,
                 "hashtags": _parse_json_array(p.hashtags),
+                "starRating": p.star_rating,  # 1-5 stars or None
             },
             "engagement": {
                 "reactions": {
@@ -259,11 +277,26 @@ class PulseRepository:
         content_media: Optional[List[str]] = None,
         linked_movie_id: Optional[str] = None,
         hashtags: Optional[List[str]] = None,
+        posted_as_role: Optional[str] = None,
+        star_rating: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Create a new pulse"""
         # Validate content length
         if len(content_text) > 280:
             raise ValueError("Content text must be 280 characters or less")
+
+        # Validate role
+        if posted_as_role and posted_as_role not in ['critic', 'industry_pro', 'talent_pro']:
+            raise ValueError(f"Invalid role: {posted_as_role}. Must be 'critic', 'industry_pro', or 'talent_pro'")
+
+        # Validate star rating
+        if star_rating is not None:
+            if not posted_as_role:
+                raise ValueError("Star rating requires a professional role (critic, industry_pro, or talent_pro)")
+            if star_rating < 1 or star_rating > 5:
+                raise ValueError("Star rating must be between 1 and 5")
+            if not linked_movie_id:
+                raise ValueError("Star rating requires a linked movie")
 
         # Get linked movie if provided
         movie_id_db = None
@@ -283,6 +316,8 @@ class PulseRepository:
             content_media=json.dumps(content_media) if content_media else None,
             linked_movie_id=movie_id_db,
             hashtags=json.dumps(hashtags) if hashtags else None,
+            posted_as_role=posted_as_role,
+            star_rating=star_rating,
             reactions_json="{}",
             reactions_total=0,
             comments_count=0,

@@ -8,6 +8,7 @@ export interface PulseType {
     displayName: string
     avatarUrl: string
     isVerified: boolean
+    role?: 'critic' | 'industry_pro' | 'talent_pro' | null
     verificationLevel?: "basic" | "industry" | "celebrity"
     isFollowing?: boolean
   }
@@ -25,6 +26,7 @@ export interface PulseType {
       posterUrl?: string
     }
     hashtags: string[]
+    starRating?: number
   }
   engagement: {
     reactions: {

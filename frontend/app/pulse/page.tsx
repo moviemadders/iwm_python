@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { FeedTab, PulsePost, PulseComment, PulseMedia, TaggedItem } from '@/types/pulse'
+import { FeedTab, PulsePost, PulseComment, PulseMedia, TaggedItem, SuggestedUser } from '@/types/pulse'
 import PulsePageLayout from '@/components/pulse/pulse-page-layout'
 import PulseLeftSidebar from '@/components/pulse/left-sidebar/pulse-left-sidebar'
 import PulseRightSidebar from '@/components/pulse/right-sidebar/pulse-right-sidebar'
@@ -66,47 +66,64 @@ export default function PulsePage() {
     fetchUser()
   }, [])
 
+  const [selectedHashtag, setSelectedHashtag] = useState<string | null>(null)
+
   // Fetch feed data
   const fetchFeed = async (page = 1, refresh = false) => {
     try {
       if (page === 1) setIsLoading(true)
 
-      const data = await pulseApi.getPulseFeed({
-        filter: activeTab === 'for_you' ? 'latest' : activeTab as any,
-        page,
-        limit: POSTS_PER_PAGE
-      })
+      let filter = 'latest';
+      let linkedType: string | undefined = undefined;
 
-      if (refresh || page === 1) {
-        setPosts(data.posts || [])
-      } else {
-        setPosts(prev => [...prev, ...(data.posts || [])])
+      if (activeTab === 'for_you') filter = 'latest';
+      else if (activeTab === 'following') filter = 'following';
+      else if (activeTab === 'movies') {
+        filter = 'latest';
+        linkedType = 'movie';
+      }
+      else if (activeTab === 'cricket') {
+        filter = 'latest';
+        linkedType = 'cricket';
       }
 
-      setPagination({
-        page: data.pagination?.current_page || page,
-        has_more: data.pagination?.has_more ?? (data.posts?.length === POSTS_PER_PAGE),
-        is_loading_more: false
+      console.log('🔍 Fetching feed with params:', { filter, page, limit: POSTS_PER_PAGE, hashtag: selectedHashtag, linkedType })
+
+      const data = await pulseApi.getPulseFeed({
+        filter: filter as any,
+        page,
+        limit: POSTS_PER_PAGE,
+        hashtag: selectedHashtag || undefined,
+        linkedType
       })
+
+      console.log('✅ Feed data received:', data)
+
+      // API returns array directly
+      const newPosts = Array.isArray(data) ? data : (data.posts || [])
+
+      console.log('📊 Parsed posts:', newPosts.length, 'posts')
+
+      if (refresh || page === 1) {
+        setPosts(newPosts)
+      } else {
+        setPosts(prev => [...prev, ...newPosts])
+      }
+
+      setPagination(prev => ({
+        ...prev,
+        has_more: newPosts.length === POSTS_PER_PAGE,
+        page: page + 1,
+        is_loading_more: false
+      }))
+
     } catch (err) {
-      console.error('Failed to fetch feed:', err)
-      // Fallback to mock data on error? Or just show error?
-      // For now, let's keep the mock fallback for smoother dev experience if backend is down
+      console.error('❌ Failed to fetch feed:', err)
+      console.error('Error details:', err instanceof Error ? err.message : String(err))
+
+      // Show empty state instead of falling back to mock data
       if (page === 1) {
-        // Filter posts by tab (mock logic)
-        let filteredPosts = [...mockPulsePosts]
-        if (activeTab === 'movies') {
-          filteredPosts = filteredPosts.filter((post) =>
-            post.content.linkedContent?.type === 'movie' ||
-            post.content.text.toLowerCase().includes('movie')
-          )
-        } else if (activeTab === 'cricket') {
-          filteredPosts = filteredPosts.filter((post) =>
-            post.content.linkedContent?.type === 'cricket_match' ||
-            post.content.text.toLowerCase().includes('cricket')
-          )
-        }
-        setPosts(filteredPosts.slice(0, POSTS_PER_PAGE))
+        setPosts([])
         setPagination({ page: 1, has_more: false, is_loading_more: false })
       }
     } finally {
@@ -116,14 +133,16 @@ export default function PulsePage() {
 
   useEffect(() => {
     fetchFeed(1, true)
-  }, [activeTab])
+  }, [activeTab, selectedHashtag])
 
   // Fetch trending topics
   useEffect(() => {
     const fetchTrending = async () => {
       try {
-        // We don't have a dedicated trending API yet in the client, but let's assume we might
-        // For now, keep mock trending
+        const topics = await pulseApi.getTrendingTopics('7d', 10)
+        if (topics && topics.length > 0) {
+          setTrendingTopics(topics)
+        }
       } catch (err) {
         console.warn('Failed to fetch trending topics', err)
       }
@@ -150,13 +169,9 @@ export default function PulsePage() {
     try {
       await pulseApi.createPulse({
         contentText: content,
-        contentMedia: media.map(m => JSON.stringify(m)), // Backend expects strings? Or we need to fix backend to accept objects?
-        // Backend expects contentMedia as List[str]. Let's assume URLs for now.
-        // But wait, our backend model stores JSON string for media.
-        // The create endpoint expects List[str].
-        // Let's just send empty list for now as media upload isn't fully implemented
+        contentMedia: media.map(m => typeof m === 'string' ? m : JSON.stringify(m)),
         linkedMovieId: taggedItems.find(t => t.type === 'movie')?.id,
-        hashtags: [] // TODO: Extract hashtags
+        hashtags: content.match(/#[a-zA-Z0-9_]+/g) || []
       })
       refreshFeed()
     } catch (err) {
@@ -289,16 +304,60 @@ export default function PulsePage() {
   // Handle topic click
   const handleTopicClick = (hashtag: string) => {
     console.log('Filter by hashtag:', hashtag)
-    // TODO: Implement hashtag filtering
+    if (selectedHashtag === hashtag) {
+      setSelectedHashtag(null) // Toggle off
+    } else {
+      setSelectedHashtag(hashtag)
+    }
   }
 
   // Handle follow
-  const handleFollow = async (userId: string) => {
-    // This is tricky because userId here might be ID or username depending on context
-    // Our API expects username.
-    // Let's assume for now we don't implement follow from the sidebar suggestions yet as they are mock data
-    console.log('Follow user:', userId)
+  const handleFollow = async (username: string) => {
+    try {
+      await pulseApi.followUser(username)
+      // Optimistically update suggested users or show toast
+      // For now, just log success
+      console.log('Followed user:', username)
+      // Ideally we should update the suggestedUsers list to remove the followed user or mark as followed
+      // But suggestedUsers is currently mock data.
+    } catch (err) {
+      console.error('Failed to follow user:', err)
+    }
   }
+
+  const [suggestedUsers, setSuggestedUsers] = useState<SuggestedUser[]>(mockSuggestedUsers)
+
+  // Fetch suggested users
+  useEffect(() => {
+    const fetchSuggested = async () => {
+      try {
+        const users = await pulseApi.getSuggestedUsers(5)
+        if (users && users.length > 0) {
+          // Map backend user to PulseUser
+          const mappedUsers: SuggestedUser[] = users.map((u: any) => ({
+            user: {
+              id: u.id,
+              username: u.username,
+              display_name: u.name,
+              avatar_url: u.avatarUrl || '/placeholder.svg?height=50&width=50',
+              is_verified: u.isVerified || false,
+              bio: u.bio,
+              follower_count: u.stats?.followers || 0,
+              following_count: u.stats?.following || 0,
+              pulse_count: 0, // Not returned by backend yet
+              created_at: u.joinedDate
+            },
+            reason: "Suggested for you", // Static reason for now
+            mutual_followers_count: 0 // Not implemented yet
+          }))
+          setSuggestedUsers(mappedUsers)
+        }
+      } catch (err) {
+        console.warn('Failed to fetch suggested users', err)
+      }
+    }
+    fetchSuggested()
+  }, [])
 
   return (
     <NoSSR>
@@ -340,7 +399,7 @@ export default function PulsePage() {
         rightSidebar={
           <PulseRightSidebar
             trendingTopics={trendingTopics}
-            suggestedUsers={mockSuggestedUsers}
+            suggestedUsers={suggestedUsers}
             trendingMovies={mockTrendingMovies}
             trendingCricket={mockTrendingCricket}
             onTopicClick={handleTopicClick}

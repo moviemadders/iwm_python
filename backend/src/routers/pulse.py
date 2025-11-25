@@ -3,12 +3,13 @@ from __future__ import annotations
 from typing import List, Optional, Any
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
 from ..db import get_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..repositories.pulse import PulseRepository
 from ..dependencies.auth import get_current_user, get_current_user_optional
-from ..models import User
+from ..models import User, UserRoleProfile
 
 router = APIRouter(prefix="/pulse", tags=["pulse"])
 
@@ -18,6 +19,32 @@ class PulseCreateBody(BaseModel):
     contentMedia: Optional[List[str]] = None
     linkedMovieId: Optional[str] = None
     hashtags: Optional[List[str]] = None
+    postedAsRole: Optional[str] = None  # 'critic', 'industry_pro', 'talent_pro'
+    starRating: Optional[int] = Field(None, ge=1, le=5)  # 1-5 stars
+
+
+async def get_user_roles(user_id: int, session: AsyncSession) -> List[str]:
+    """
+    Get active roles for user from user_role_profiles table.
+    Maps role_type to posted_as_role format.
+    
+    Returns: List of roles like ['critic', 'industry_pro', 'talent_pro']
+    """
+    result = await session.execute(
+        select(UserRoleProfile.role_type)
+        .where(UserRoleProfile.user_id == user_id)
+        .where(UserRoleProfile.enabled == True)
+    )
+    role_types = [row[0] for row in result]
+    
+    # Map role_type to posted_as_role format
+    role_mapping = {
+        'critic': 'critic',
+        'industry': 'industry_pro',
+        'talent': 'talent_pro'
+    }
+    
+    return [role_mapping.get(r) for r in role_types if r in role_mapping]
 
 
 @router.get("/")
@@ -29,6 +56,8 @@ async def get_feed(
     limit: int = Query(20, ge=1, le=100),
     viewerId: Optional[str] = Query(None),
     hashtag: Optional[str] = Query(None),
+    linkedMovieId: Optional[str] = Query(None),
+    linkedType: Optional[str] = Query(None),
     session: AsyncSession = Depends(get_session),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
@@ -43,7 +72,9 @@ async def get_feed(
         page=page,
         limit=limit,
         viewer_external_id=viewerId,
-        hashtag=hashtag
+        hashtag=hashtag,
+        linked_movie_id=linkedMovieId,
+        linked_type=linkedType
     )
 
 
@@ -64,6 +95,15 @@ async def create_pulse(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Create a new pulse"""
+    # Verify user has claimed role if posting as professional
+    if body.postedAsRole:
+        user_roles = await get_user_roles(current_user.id, session)
+        if body.postedAsRole not in user_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"User does not have '{body.postedAsRole}' role. Available roles: {user_roles}"
+            )
+    
     repo = PulseRepository(session)
     try:
         result = await repo.create(
@@ -72,6 +112,8 @@ async def create_pulse(
             content_media=body.contentMedia,
             linked_movie_id=body.linkedMovieId,
             hashtags=body.hashtags,
+            posted_as_role=body.postedAsRole,
+            star_rating=body.starRating,
         )
         await session.commit()
         return result
@@ -223,7 +265,7 @@ async def share_pulse(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """Share a pulse (increment share count)"""
+    """Share a pulse (increment share count - legacy endpoint)"""
     repo = PulseRepository(session)
     try:
         count = await repo.share_pulse(pulse_id=pulse_id)
@@ -235,3 +277,178 @@ async def share_pulse(
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=500, detail="Failed to share pulse")
+
+
+# ==================== COMMENTS ====================
+
+class CommentCreateBody(BaseModel):
+    content: str = Field(..., max_length=500)
+
+
+@router.post("/{pulse_id}/comments", status_code=status.HTTP_201_CREATED)
+async def add_comment(
+    pulse_id: str,
+    body: CommentCreateBody,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Add a comment to a pulse"""
+    repo = PulseRepository(session)
+    try:
+        comment = await repo.add_comment(
+            user_id=current_user.id,
+            pulse_id=pulse_id,
+            content=body.content
+        )
+        await session.commit()
+        return comment
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to add comment")
+
+
+@router.get("/{pulse_id}/comments")
+async def get_comments(
+    pulse_id: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+) -> Any:
+    """Get comments for a pulse"""
+    repo = PulseRepository(session)
+    try:
+        comments = await repo.get_comments(pulse_id=pulse_id, page=page, limit=limit)
+        return {"comments": comments, "page": page, "limit": limit}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to fetch comments")
+
+
+@router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_comment(
+    comment_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a comment"""
+    repo = PulseRepository(session)
+    success = await repo.delete_comment(user_id=current_user.id, comment_id=comment_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Comment not found or access denied"
+        )
+    await session.commit()
+    return None
+
+
+# ==================== COMMENT LIKES ====================
+
+@router.post("/comments/{comment_id}/like")
+async def like_comment(
+    comment_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Like a comment"""
+    repo = PulseRepository(session)
+    try:
+        result = await repo.like_comment(user_id=current_user.id, comment_id=comment_id)
+        await session.commit()
+        return result
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to like comment")
+
+
+@router.delete("/comments/{comment_id}/like")
+async def unlike_comment(
+    comment_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Unlike a comment"""
+    repo = PulseRepository(session)
+    try:
+        result = await repo.unlike_comment(user_id=current_user.id, comment_id=comment_id)
+        await session.commit()
+        return result
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to unlike comment")
+
+
+# ==================== ENHANCED SHARE TRACKING ====================
+
+class ShareCreateBody(BaseModel):
+    shareType: str = Field("echo", pattern="^(echo|quote_echo)$")
+    quoteContent: Optional[str] = Field(None, max_length=280)
+
+
+@router.post("/{pulse_id}/share-detailed", status_code=status.HTTP_201_CREATED)
+async def create_share(
+    pulse_id: str,
+    body: ShareCreateBody,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Create a tracked share with user details and optional quote"""
+    repo = PulseRepository(session)
+    try:
+        share = await repo.create_share(
+            user_id=current_user.id,
+            pulse_id=pulse_id,
+            share_type=body.shareType,
+            quote_content=body.quoteContent
+        )
+        await session.commit()
+        return share
+    except ValueError as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to create share")
+
+
+@router.get("/{pulse_id}/shares")
+async def get_shares(
+    pulse_id: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
+    session: AsyncSession = Depends(get_session),
+) -> Any:
+    """Get users who shared a pulse"""
+    repo = PulseRepository(session)
+    try:
+        shares = await repo.get_shares(pulse_id=pulse_id, page=page, limit=limit)
+        return {"shares": shares, "page": page, "limit": limit}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to fetch shares")
+
+
+@router.delete("/{pulse_id}/share-detailed", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_share(
+    pulse_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a user's share"""
+    repo = PulseRepository(session)
+    success = await repo.delete_share(user_id=current_user.id, pulse_id=pulse_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Share not found"
+        )
+    await session.commit()
+    return None
+

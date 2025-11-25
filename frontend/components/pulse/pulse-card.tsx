@@ -20,17 +20,21 @@ import {
   Facebook,
   Mail,
   Check,
+  Star,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import {
   TooltipProvider,
   TooltipTrigger,
+  Tooltip,
+  TooltipContent,
 } from "@/components/ui/tooltip"
 import { useMobile } from "@/hooks/use-mobile"
 
@@ -135,7 +139,16 @@ export default function PulseCard({ pulse, onReaction }: PulseCardProps) {
     let badgeColor = "text-[#00BFFF]"
     let tooltipText = "Verified User"
 
-    if (pulse.userInfo.verificationLevel === "industry") {
+    if (pulse.userInfo.role === "critic") {
+      badgeColor = "text-[#FFD700]"
+      tooltipText = "Verified Critic"
+    } else if (pulse.userInfo.role === "industry_pro") {
+      badgeColor = "text-[#00BFFF]"
+      tooltipText = "Verified Industry Professional"
+    } else if (pulse.userInfo.role === "talent_pro") {
+      badgeColor = "text-[#FF4D4D]"
+      tooltipText = "Verified Talent Professional"
+    } else if (pulse.userInfo.verificationLevel === "industry") {
       badgeColor = "text-[#FFD700]"
       tooltipText = "Verified Industry Professional"
     } else if (pulse.userInfo.verificationLevel === "celebrity") {
@@ -210,6 +223,19 @@ export default function PulseCard({ pulse, onReaction }: PulseCardProps) {
 
           {/* Pulse Text */}
           <div className="mb-3">
+            {pulse.content.starRating && (
+              <div className="flex items-center gap-1 mb-2">
+                <div className="flex">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`h-4 w-4 ${i < pulse.content.starRating! ? "text-yellow-500 fill-yellow-500" : "text-gray-600"
+                        }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
             {isTextLong && !isExpanded ? (
               <>
                 <p className="text-[#E0E0E0] whitespace-pre-line">
@@ -234,7 +260,7 @@ export default function PulseCard({ pulse, onReaction }: PulseCardProps) {
           {/* Media Content */}
           {pulse.content.media && pulse.content.media.length > 0 && (
             <div className={`mb-3 grid ${pulse.content.media.length > 1 ? "grid-cols-2" : "grid-cols-1"} gap-2`}>
-              {pulse.content.media.map((item, index) => (
+              {pulse.content.media.map((item: any, index: number) => (
                 <div key={index} className="relative rounded-md overflow-hidden">
                   <img
                     src={item.url || "/placeholder.svg"}
@@ -278,7 +304,7 @@ export default function PulseCard({ pulse, onReaction }: PulseCardProps) {
           {/* Hashtags */}
           {pulse.content.hashtags && pulse.content.hashtags.length > 0 && (
             <div className="mb-3 flex flex-wrap gap-1">
-              {pulse.content.hashtags.map((tag, index) => (
+              {pulse.content.hashtags.map((tag: string, index: number) => (
                 <span key={index} className="text-[#00BFFF] hover:underline cursor-pointer">
                   {tag}
                 </span>

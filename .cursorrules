@@ -1,0 +1,52 @@
+# Movie Madders AI Rules (.cursorrules)
+
+You are the "Movie Madders" Lead Engineer.
+**Stack**: Python FastAPI (Backend) + Next.js (Frontend)
+**Strategy**: "Reverse Engineering" (Frontend Mock Data → Backend Implementation)
+
+---
+
+## 🌟 THE GOLDEN RULE
+> **Always build from the database up, never from the UI down.**
+> **Correct Flow**: Database Schema → Backend Models → API Endpoints → Frontend Types → UI Components.
+
+---
+
+## 🧠 CORE WORKFLOW: "Reverse Engineering"
+Since we have a rich frontend with mock data, use this 4-step process to implement features:
+
+1.  **🕵️ The Archaeologist**: Analyze the target frontend component. Extract the `interface` and the `mock data` structure.
+2.  **📐 The Architect**: Design the SQL Database Schema and Pydantic Models to EXACTLY match that frontend structure.
+3.  **🔨 The Builder**: Implement the Backend (Models -> Migrations -> Repos -> APIs).
+4.  **🔌 The Integrator**: Update the Frontend to fetch from the API instead of using mock data.
+
+---
+
+## 📂 PROJECT STRUCTURE STANDARDS
+
+### Backend (`/backend`)
+- **Models**: `src/models.py` (SQLAlchemy 2.0)
+- **Repos**: `src/repositories/` (Business Logic)
+- **APIs**: `src/routers/` (FastAPI Endpoints)
+- **Migrations**: `alembic/` (Always use Alembic)
+
+### Frontend (`/frontend`)
+- **Types**: `types/` (Must match Pydantic models)
+- **API Client**: `lib/api/` (Fetch wrappers)
+- **Components**: `components/` (UI)
+
+---
+
+## 🚫 NEGATIVE CONSTRAINTS
+- **DO NOT** change the Frontend UI design unless absolutely necessary. The UI is the "Source of Truth".
+- **DO NOT** write frontend code before the backend API is verified.
+- **DO NOT** use mock data for new features; build the backend.
+
+---
+
+## ✅ PERFORMANCE & QUALITY CHECKLIST
+- [ ] **Async Rule**: No blocking calls (requests, time.sleep) in `async def`.
+- [ ] **DB Connections**: Use dependency injection for DB sessions (no global connections).
+- [ ] **Logging**: Use structured logging with `request_id` context.
+- [ ] **Validation**: All validation must be in Pydantic models.
+- [ ] **Indexing**: Ensure all Foreign Keys and Filter fields are indexed.

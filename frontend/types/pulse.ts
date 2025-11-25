@@ -118,6 +118,7 @@ export interface PulseUserInfo {
   displayName: string
   avatarUrl: string
   isVerified: boolean
+  role?: 'critic' | 'industry_pro' | 'talent_pro' | null
   verificationLevel?: string
   isFollowing?: boolean
 }
@@ -139,6 +140,7 @@ export interface PulsePost {
       posterUrl?: string
     }
     hashtags?: string[]
+    starRating?: number
   }
   engagement: {
     reactions: {
@@ -431,4 +433,159 @@ export interface TrendingResponse {
   movies: TrendingMovie[]
   cricket: TrendingCricketMatch[]
 }
+
+// ============================================================================
+// COMMENT LIKES (NEW)
+// ============================================================================
+
+export interface CommentLikeResponse {
+  liked: boolean
+  likeCount: number
+}
+
+// ============================================================================
+// ENHANCED SHARE TRACKING (NEW)
+// ============================================================================
+
+export type ShareType = 'echo' | 'quote_echo'
+
+export interface PulseShare {
+  id: string
+  pulseId: string
+  user: {
+    userId: string
+    username: string
+    displayName: string
+    avatarUrl?: string
+  }
+  shareType: ShareType
+  quoteContent?: string
+  createdAt: string
+}
+
+export interface SharesResponse {
+  shares: PulseShare[]
+  page: number
+  limit: number
+}
+
+// ============================================================================
+// DIRECT MESSAGES (NEW)
+// ============================================================================
+
+export interface MessageParticipant {
+  userId: string
+  username: string
+  displayName: string
+  avatarUrl?: string
+  joinedAt: string
+}
+
+export interface LastMessage {
+  content: string
+  senderId?: string
+  timestamp: string
+}
+
+export interface Conversation {
+  id: string
+  participants: MessageParticipant[]
+  lastMessageAt: string
+  lastMessage?: LastMessage
+  unreadCount: number
+  createdAt: string
+}
+
+export interface MessageSender {
+  userId: string
+  username: string
+  displayName: string
+  avatarUrl?: string
+}
+
+export interface Message {
+  id: string
+  conversationId: string
+  sender: MessageSender
+  content: string
+  mediaUrl?: string
+  isRead: boolean
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface UnreadCountResponse {
+  unreadCount: number
+}
+
+// ============================================================================
+// USER DAILY STATS (NEW)
+// ============================================================================
+
+export interface DailyStats {
+  date: string
+  pulsesPosted: number
+  likesReceived: number
+  newFollowers: number
+  commentsReceived: number
+}
+
+export interface StatsTotals {
+  pulsesPosted: number
+  likesReceived: number
+  newFollowers: number
+  commentsReceived: number
+}
+
+export interface StatsRangeResponse {
+  startDate: string
+  endDate: string
+  totals: StatsTotals
+  daily: DailyStats[]
+}
+
+// ============================================================================
+// PULSE NOTIFICATIONS (NEW)
+// ============================================================================
+
+export type NotificationType = 'follow' | 'like' | 'comment' | 'mention' | 'share'
+
+export interface NotificationActor {
+  userId: string
+  username: string
+  displayName: string
+  avatarUrl?: string
+}
+
+export interface NotificationPulse {
+  id: string
+  contentText: string
+}
+
+export interface NotificationComment {
+  id: string
+  content: string
+}
+
+export interface PulseNotification {
+  id: string
+  type: NotificationType
+  actor: NotificationActor
+  content?: string
+  pulse?: NotificationPulse
+  comment?: NotificationComment
+  isRead: boolean
+  createdAt: string
+}
+
+export interface NotificationsResponse {
+  notifications: PulseNotification[]
+  page: number
+  limit: number
+}
+
+export interface NotificationUnreadCountResponse {
+  unreadCount: number
+}
+
 
