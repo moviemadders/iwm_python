@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/profile/empty-state"
 import Image from "next/image"
 import Link from "next/link"
 import { getUserHistory } from "@/lib/api/profile"
+import { useWatchHistory } from "@/hooks/useWatchHistory"
 
 interface HistoryItem {
   id: string
@@ -34,50 +35,47 @@ export function ProfileHistory({ userId }: ProfileHistoryProps) {
   const [sortBy, setSortBy] = useState("recent")
   const [filterRated, setFilterRated] = useState("all")
 
+  const { history: data, isLoading: isHistoryLoading, isError } = useWatchHistory(userId)
+
   useEffect(() => {
-    const fetchHistory = async () => {
-      setIsLoading(true)
-      setError(null)
-
-      try {
-        const data = await getUserHistory(userId)
-
-        // Transform API response to HistoryItem format
-        const transformedHistory: HistoryItem[] = data.map((item: any) => {
-          const watchedDate = item.dateAdded || new Date().toISOString()
-          const formattedDate = new Date(watchedDate).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-          })
-
-          return {
-            id: item.id,
-            movieId: item.movieId || item.movie?.id || "",
-            movieTitle: item.movie?.title || "Unknown Movie",
-            moviePosterUrl: item.movie?.posterUrl || "/placeholder.svg",
-            movieYear: String(item.movie?.year || ""),
-            watchedDate: watchedDate,
-            formattedDate: formattedDate,
-            userRating: item.rating,
-            genres: item.movie?.genres || [],
-          }
+    if (data) {
+      // Transform API response to HistoryItem format
+      const transformedHistory: HistoryItem[] = data.map((item: any) => {
+        const watchedDate = item.dateAdded || new Date().toISOString()
+        const formattedDate = new Date(watchedDate).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
         })
 
-        setHistory(transformedHistory)
-      } catch (err) {
-        console.error("Failed to fetch watch history:", err)
-        setError(err instanceof Error ? err.message : "Failed to load watch history")
-        setHistory([])
-      } finally {
-        setIsLoading(false)
-      }
-    }
+        return {
+          id: item.id,
+          movieId: item.movieId || item.movie?.id || "",
+          movieTitle: item.movie?.title || "Unknown Movie",
+          moviePosterUrl: item.movie?.posterUrl || "/placeholder.svg",
+          movieYear: String(item.movie?.year || ""),
+          watchedDate: watchedDate,
+          formattedDate: formattedDate,
+          userRating: item.rating,
+          genres: item.movie?.genres || [],
+        }
+      })
 
-    if (userId) {
-      fetchHistory()
+      setHistory(transformedHistory)
     }
-  }, [userId])
+  }, [data])
+
+  useEffect(() => {
+    setIsLoading(isHistoryLoading)
+  }, [isHistoryLoading])
+
+  useEffect(() => {
+    if (isError) {
+      console.error("Failed to fetch watch history:", isError)
+      setError(isError instanceof Error ? isError.message : "Failed to load watch history")
+      setHistory([])
+    }
+  }, [isError])
 
   // Filter and sort history
   const filteredHistory = history
