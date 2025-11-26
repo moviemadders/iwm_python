@@ -37,18 +37,11 @@ class RoleProfileResponse(BaseModel):
     visibility: str
     is_default: bool
     handle: Optional[str] = None
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
-
-    @field_serializer('created_at', 'updated_at', mode='plain')
-    def serialize_datetime(self, value: Any) -> str:
-        """Serialize datetime objects to ISO format strings"""
-        if isinstance(value, datetime):
-            return value.isoformat()
-        return str(value) if value else None
 
 
 class RoleProfileListResponse(BaseModel):
@@ -202,7 +195,9 @@ async def get_user_roles(
             total=len(roles)
         )
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to fetch roles")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to fetch roles: {str(e)}")
 
 
 # ============================================================================

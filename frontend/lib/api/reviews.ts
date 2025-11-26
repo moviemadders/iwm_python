@@ -210,3 +210,73 @@ export async function getUserReviews(userId: string, page: number = 1, limit: nu
   }
 }
 
+
+/**
+ * Vote on a review (helpful or unhelpful)
+ */
+export async function voteOnReview(reviewId: string, voteType: "helpful" | "unhelpful") {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/reviews/${reviewId}/vote?vote_type=${voteType}`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || `Failed to vote on review: ${response.statusText}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error("Error voting on review:", error)
+    throw error
+  }
+}
+
+/**
+ * Remove vote from a review
+ */
+export async function removeVote(reviewId: string) {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/reviews/${reviewId}/vote`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || `Failed to remove vote: ${response.statusText}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error("Error removing vote:", error)
+    throw error
+  }
+}
+
+/**
+ * Get current user's vote on a review
+ */
+export async function getUserVote(reviewId: string) {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/reviews/${reviewId}/vote`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    })
+
+    if (!response.ok) {
+      // 404 likely means no vote yet
+      if (response.status === 404) {
+        return { voteType: null }
+      }
+      throw new Error(`Failed to get user vote: ${response.statusText}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error("Error getting user vote:", error)
+    throw error
+  }
+}
+

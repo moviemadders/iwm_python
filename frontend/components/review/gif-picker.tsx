@@ -91,8 +91,9 @@ export function GifPicker({ isOpen, onClose, onSelectGif }: GifPickerProps) {
             console.error("Failed to register GIF share:", err)
         }
 
-        // Use medium GIF for better quality
+        // Use medium GIF for better quality, fallback to standard GIF
         const gifUrl = gif.media_formats.mediumgif?.url || gif.media_formats.gif.url
+        console.log("Selected GIF URL:", gifUrl)
         onSelectGif(gifUrl)
         onClose()
     }

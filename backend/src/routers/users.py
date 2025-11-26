@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, List
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from ..db import get_session
-from ..models import User, Review, Watchlist, Favorite, Collection, UserSettings
+from ..models import User, Review, Watchlist, Favorite, Collection, UserSettings, UserFollow
 from ..dependencies.auth import get_current_user_optional
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -20,6 +20,15 @@ class UserStatsResponse(BaseModel):
     collections: int
     following: int
     followers: int
+
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    bio: Optional[str] = None
+    location: Optional[str] = None
+    website: Optional[str] = None
+    avatarUrl: Optional[str] = None
+    bannerUrl: Optional[str] = None
 
 
 class UserProfileResponse(BaseModel):
@@ -38,6 +47,48 @@ class UserProfileResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SuggestedUser(BaseModel):
+    id: str
+    username: str
+    displayName: str
+    avatarUrl: str | None
+    isVerified: bool
+    mutualCount: int = 0
+
+
+@router.get("/suggested", response_model=List[SuggestedUser])
+async def get_suggested_users(
+    limit: int = Query(5, ge=1, le=20),
+    session: AsyncSession = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
+) -> Any:
+    """
+    Get suggested users to follow.
+    For now, returns random users.
+    """
+    # Simple implementation: get random users
+    query = select(User).order_by(func.random()).limit(limit)
+    
+    # If logged in, exclude self
+    if current_user:
+        query = query.where(User.id != current_user.id)
+        
+    result = await session.execute(query)
+    users = result.scalars().all()
+    
+    return [
+        {
+            "id": str(user.id),  # Use internal ID for now as frontend expects string
+            "username": user.username or user.email.split("@")[0],
+            "displayName": user.name or "User",
+            "avatarUrl": user.avatar_url,
+            "isVerified": False,  # TODO: Add verification logic
+            "mutualCount": 0,
+        }
+        for user in users
+    ]
 
 
 @router.get("/{username}", response_model=UserProfileResponse)
@@ -115,19 +166,81 @@ async def get_user_by_username(
         # Fallback to email prefix if username not set
         display_username = user.email.split('@')[0] if '@' in user.email else user.email
 
+    # Determine verification status based on active role
+    is_verified = False
+    if user.active_role == "critic" and user.critic_profile:
+        is_verified = user.critic_profile.is_verified
+    
     return UserProfileResponse(
         id=user.external_id,
         username=display_username,
         name=user.name,
         email=user.email,
-        bio=None,  # TODO: Add bio field to User model
+        bio=user.bio,
         avatarUrl=user.avatar_url,
         bannerUrl=user.banner_url,
         joinedDate=user.created_at.strftime("%B %Y"),
-        location=None,  # TODO: Add location field to User model
-        website=None,  # TODO: Add website field to User model
+        location=user.location,
+        website=user.website,
         stats=stats,
-        isVerified=False,  # TODO: Add is_verified field to User model
+        isVerified=is_verified,
+    )
+
+
+@router.put("/me", response_model=UserProfileResponse)
+async def update_current_user_profile(
+    user_update: UserUpdate,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user_optional),
+) -> Any:
+    """
+    Update current user's profile.
+    """
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
+
+    # Update fields if provided
+    if user_update.name is not None:
+        current_user.name = user_update.name
+    if user_update.bio is not None:
+        current_user.bio = user_update.bio
+    if user_update.location is not None:
+        current_user.location = user_update.location
+    if user_update.website is not None:
+        current_user.website = user_update.website
+    if user_update.avatarUrl is not None:
+        current_user.avatar_url = user_update.avatarUrl
+    if user_update.bannerUrl is not None:
+        current_user.banner_url = user_update.bannerUrl
+
+    session.add(current_user)
+    await session.commit()
+    await session.refresh(current_user)
+
+    # Get stats for response
+    stats = await get_user_stats_internal(current_user.id, session)
+
+    # Determine display username
+    display_username = current_user.username
+    if not display_username:
+        display_username = current_user.email.split('@')[0] if '@' in current_user.email else current_user.email
+
+    return UserProfileResponse(
+        id=current_user.external_id,
+        username=display_username,
+        name=current_user.name,
+        email=current_user.email,
+        bio=current_user.bio,
+        avatarUrl=current_user.avatar_url,
+        bannerUrl=current_user.banner_url,
+        joinedDate=current_user.created_at.strftime("%B %Y"),
+        location=current_user.location,
+        website=current_user.website,
+        stats=stats,
+        isVerified=False,
     )
 
 
@@ -273,3 +386,61 @@ async def unfollow_user(
     await session.commit()
     return {"following": False}
 
+@router.get("/suggested", response_model=List[UserProfileResponse])
+async def get_suggested_users(
+    limit: int = Query(5, ge=1, le=20),
+    session: AsyncSession = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
+) -> Any:
+    """
+    Get suggested users to follow.
+    For now, returns random users.
+    """
+    # Get IDs of users currently followed by the user
+    followed_ids = []
+    if current_user:
+        followed_stmt = select(UserFollow.following_id).where(UserFollow.follower_id == current_user.id)
+        followed_result = await session.execute(followed_stmt)
+        followed_ids = followed_result.scalars().all()
+
+    query = select(User).limit(limit)
+    
+    if current_user:
+        # Exclude self
+        query = query.where(User.id != current_user.id)
+        # Exclude already followed users
+        if followed_ids:
+            query = query.where(User.id.not_in(followed_ids))
+    
+    # Randomize (PostgreSQL specific)
+    query = query.order_by(func.random())
+    
+    result = await session.execute(query)
+    users = result.scalars().all()
+    
+    response = []
+    for user in users:
+        # Get stats for each user
+        stats = await get_user_stats_internal(user.id, session)
+        
+        # Determine display username
+        display_username = user.username
+        if not display_username:
+            display_username = user.email.split('@')[0] if '@' in user.email else user.email
+            
+        response.append(UserProfileResponse(
+            id=user.external_id,
+            username=display_username,
+            name=user.name,
+            email=user.email,
+            bio=user.bio,
+            avatarUrl=user.avatar_url,
+            bannerUrl=user.banner_url,
+            joinedDate=user.created_at.strftime("%B %Y"),
+            location=user.location,
+            website=user.website,
+            stats=stats,
+            isVerified=False,
+        ))
+        
+    return response

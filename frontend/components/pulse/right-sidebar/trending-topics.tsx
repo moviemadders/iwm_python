@@ -46,7 +46,7 @@ export default function TrendingTopics({ topics, onTopicClick }: TrendingTopicsP
                   )}
                 </div>
                 <p className="text-xs text-[#A0A0A0] mt-1">
-                  {topic.pulse_count.toLocaleString()} pulses
+                  {(topic.pulse_count || 0).toLocaleString()} pulses
                 </p>
               </div>
             </div>

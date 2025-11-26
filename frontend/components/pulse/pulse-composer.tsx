@@ -15,7 +15,15 @@ import {
   BirdIcon as Cricket,
   Search,
   Plus,
+  Star,
 } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -54,6 +62,8 @@ export function PulseComposer({ onClose, onSubmit }: PulseComposerProps) {
   const [showContentDialog, setShowContentDialog] = useState<"movie" | "cricket" | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<any[]>([])
+  const [selectedRole, setSelectedRole] = useState<string>("")
+  const [starRating, setStarRating] = useState<number>(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const isMobile = useMobile()
 
@@ -156,12 +166,14 @@ export function PulseComposer({ onClose, onSubmit }: PulseComposerProps) {
         isVerified: true,
         verificationLevel: "basic",
         isFollowing: false,
+        role: selectedRole as any || null,
       },
       content: {
         text: text,
         media: media.length > 0 ? media : undefined,
         linkedContent: linkedContent || undefined,
         hashtags: extractHashtags(text),
+        starRating: (selectedRole && linkedContent && starRating > 0) ? starRating : undefined,
       },
       engagement: {
         reactions: {
@@ -374,9 +386,22 @@ export function PulseComposer({ onClose, onSubmit }: PulseComposerProps) {
       >
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold">Create Pulse</h3>
-          <Button variant="ghost" size="icon" onClick={onClose} className="text-[#A0A0A0] hover:text-white">
-            <X className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Select value={selectedRole} onValueChange={setSelectedRole}>
+              <SelectTrigger className="w-[140px] h-8 bg-[#1A1A1A] border-[#3A3A3A] text-xs">
+                <SelectValue placeholder="Post as..." />
+              </SelectTrigger>
+              <SelectContent className="bg-[#282828] border-[#3A3A3A] text-white">
+                <SelectItem value="personal">Personal</SelectItem>
+                <SelectItem value="critic">As Critic 🎬</SelectItem>
+                <SelectItem value="industry_pro">As Filmmaker 🎥</SelectItem>
+                <SelectItem value="talent_pro">As Talent 🌟</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="ghost" size="icon" onClick={onClose} className="text-[#A0A0A0] hover:text-white">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         <div className="flex gap-3 mb-4">
@@ -448,6 +473,27 @@ export function PulseComposer({ onClose, onSubmit }: PulseComposerProps) {
                     </div>
                     <div className="font-medium">{linkedContent.title}</div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Star Rating Input */}
+            {linkedContent && selectedRole && selectedRole !== "personal" && (
+              <div className="mt-3 bg-[#1A1A1A] rounded-md p-3 border border-[#3A3A3A] flex items-center justify-between">
+                <span className="text-sm text-[#A0A0A0]">Rate this title:</span>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => setStarRating(star)}
+                      className="focus:outline-none transition-transform hover:scale-110"
+                    >
+                      <Star
+                        className={`h-6 w-6 ${star <= starRating ? "text-yellow-500 fill-yellow-500" : "text-[#3A3A3A]"
+                          }`}
+                      />
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

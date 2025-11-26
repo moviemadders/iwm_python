@@ -1344,11 +1344,20 @@ export const pulseApi = {
     if (params.hashtag) query.append("hashtag", params.hashtag)
     if (params.linkedType) query.append("linkedType", params.linkedType)
 
-    const res = await fetch(`${getApiUrl()}/api/v1/pulse/feed?${query.toString()}`, {
-      headers: getAuthHeaders(),
+    const response = await fetch(`${getApiUrl()}/api/v1/pulse/feed?${query.toString()}`, {
+      method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      mode: "cors",
     })
-    if (!res.ok) throw new Error("Failed to fetch feed")
-    return res.json()
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Failed to fetch feed: ${response.status} - ${errorText}`)
+    }
+    return response.json()
   },
 
   getTrendingTopics: async (window: "24h" | "7d" | "30d" = "7d", limit = 10) => {
@@ -1356,11 +1365,17 @@ export const pulseApi = {
       window,
       limit: limit.toString(),
     })
-    const res = await fetch(`${getApiUrl()}/api/v1/pulse/trending-topics?${query.toString()}`, {
-      headers: getAuthHeaders(),
+    const response = await fetch(`${getApiUrl()}/api/v1/pulse/trending-topics?${query.toString()}`, {
+      method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      mode: "cors",
     })
-    if (!res.ok) throw new Error("Failed to fetch trending topics")
-    return res.json()
+    if (!response.ok) throw new Error("Failed to fetch trending topics")
+    return response.json()
   },
 
   createPulse: async (data: {
@@ -1371,129 +1386,188 @@ export const pulseApi = {
     postedAsRole?: string
     starRating?: number
   }) => {
-    const res = await fetch(`${getApiUrl()}/api/v1/pulse`, {
+    const response = await fetch(`${getApiUrl()}/api/v1/pulse`, {
       method: "POST",
       headers: {
         ...getAuthHeaders(),
         "Content-Type": "application/json",
       },
+      credentials: "include",
+      mode: "cors",
       body: JSON.stringify(data),
     })
-    if (!res.ok) throw new Error("Failed to create pulse")
-    return res.json()
+    if (!response.ok) throw new Error("Failed to create pulse")
+    return response.json()
   },
 
   deletePulse: async (id: string) => {
-    const res = await fetch(`${getApiUrl()}/api/v1/pulse/${id}`, {
+    const response = await fetch(`${getApiUrl()}/api/v1/pulse/${id}`, {
       method: "DELETE",
-      headers: getAuthHeaders(),
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      mode: "cors",
     })
-    if (!res.ok) throw new Error("Failed to delete pulse")
-    return res.json()
+    if (!response.ok) throw new Error("Failed to delete pulse")
+    return response.json()
   },
 
   toggleReaction: async (id: string, type: string) => {
-    const res = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/reactions`, {
+    const response = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/reactions`, {
       method: "POST",
       headers: {
         ...getAuthHeaders(),
         "Content-Type": "application/json",
       },
+      credentials: "include",
+      mode: "cors",
       body: JSON.stringify({ type }),
     })
-    if (!res.ok) throw new Error("Failed to toggle reaction")
-    return res.json()
+    if (!response.ok) throw new Error("Failed to toggle reaction")
+    return response.json()
   },
 
   addComment: async (id: string, content: string) => {
-    const res = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/comments`, {
+    const response = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/comments`, {
       method: "POST",
       headers: {
         ...getAuthHeaders(),
         "Content-Type": "application/json",
       },
+      credentials: "include",
+      mode: "cors",
       body: JSON.stringify({ content }),
     })
-    if (!res.ok) throw new Error("Failed to add comment")
-    return res.json()
+    if (!response.ok) throw new Error("Failed to add comment")
+    return response.json()
   },
 
   getComments: async (id: string, page = 1, limit = 20) => {
-    const res = await fetch(
+    const response = await fetch(
       `${getApiUrl()}/api/v1/pulse/${id}/comments?page=${page}&limit=${limit}`,
       {
-        headers: getAuthHeaders(),
+        method: "GET",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        mode: "cors",
       }
     )
-    if (!res.ok) throw new Error("Failed to get comments")
-    return res.json()
+    if (!response.ok) throw new Error("Failed to get comments")
+    return response.json()
   },
 
   bookmarkPulse: async (id: string) => {
-    const res = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/bookmark`, {
+    const response = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/bookmark`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      mode: "cors",
     })
-    if (!res.ok) throw new Error("Failed to bookmark pulse")
-    return res.json()
+    if (!response.ok) throw new Error("Failed to bookmark pulse")
+    return response.json()
   },
 
   unbookmarkPulse: async (id: string) => {
-    const res = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/bookmark`, {
+    const response = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/bookmark`, {
       method: "DELETE",
-      headers: getAuthHeaders(),
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      mode: "cors",
     })
-    if (!res.ok) throw new Error("Failed to unbookmark pulse")
-    return res.json()
+    if (!response.ok) throw new Error("Failed to unbookmark pulse")
+    return response.json()
   },
 
   sharePulse: async (id: string) => {
-    const res = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/share`, {
+    const response = await fetch(`${getApiUrl()}/api/v1/pulse/${id}/share`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      mode: "cors",
     })
-    if (!res.ok) throw new Error("Failed to share pulse")
-    return res.json()
+    if (!response.ok) throw new Error("Failed to share pulse")
+    return response.json()
   },
 
   followUser: async (username: string) => {
-    const res = await fetch(`${getApiUrl()}/api/v1/users/${username}/follow`, {
+    const response = await fetch(`${getApiUrl()}/api/v1/users/${username}/follow`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      mode: "cors",
     })
-    if (!res.ok) throw new Error("Failed to follow user")
-    return res.json()
+    if (!response.ok) throw new Error("Failed to follow user")
+    return response.json()
   },
 
   unfollowUser: async (username: string) => {
-    const res = await fetch(`${getApiUrl()}/api/v1/users/${username}/follow`, {
+    const response = await fetch(`${getApiUrl()}/api/v1/users/${username}/follow`, {
       method: "DELETE",
-      headers: getAuthHeaders(),
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      mode: "cors",
     })
-    if (!res.ok) throw new Error("Failed to unfollow user")
-    return res.json()
+    if (!response.ok) throw new Error("Failed to unfollow user")
+    return response.json()
   },
 
   getSuggestedUsers: async (limit = 5) => {
-    const res = await fetch(`${getApiUrl()}/api/v1/users/suggested?limit=${limit}`, {
-      headers: getAuthHeaders(),
+    const response = await fetch(`${getApiUrl()}/api/v1/users/suggested?limit=${limit}`, {
+      method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      mode: "cors",
     })
-    if (!res.ok) throw new Error("Failed to fetch suggested users")
-    return res.json()
+    if (!response.ok) throw new Error("Failed to fetch suggested users")
+    return response.json()
   },
 
   uploadMedia: async (file: File) => {
     const formData = new FormData()
     formData.append("file", file)
 
-    const res = await fetch(`${getApiUrl()}/api/v1/upload/media`, {
+    const headers = getAuthHeaders()
+    if (!headers.Authorization) {
+      throw new Error("Authentication required for upload")
+    }
+
+    const response = await fetch(`${getApiUrl()}/api/v1/upload/media`, {
       method: "POST",
       headers: {
-        Authorization: getAuthHeaders().Authorization || "",
+        Authorization: headers.Authorization,
       },
+      credentials: "include",
+      mode: "cors",
       body: formData,
     })
-    if (!res.ok) throw new Error("Failed to upload media")
-    return res.json()
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Failed to upload media: ${response.status} - ${errorText}`)
+    }
+    return response.json()
   },
 }
+

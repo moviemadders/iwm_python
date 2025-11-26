@@ -94,7 +94,7 @@ export const mockPulsePosts: PulsePost[] = [
         type: 'movie',
         id: 'movie-1',
         title: 'Inception',
-        posterUrl: 'https://image.tmdb.org/t/p/w500/placeholder.jpg',
+        posterUrl: 'https://placehold.co/500x750?text=Placeholder',
       },
       hashtags: ['ChristopherNolan'],
     },

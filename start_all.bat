@@ -1,11 +1,19 @@
 @echo off
+setlocal EnableDelayedExpansion
+
 echo ==========================================
 echo   Movie Madders Development Starter
 echo ==========================================
 
 echo.
 echo [1/2] Starting Backend Server...
-start "Movie Madders Backend" cmd /k "cd backend && start.bat"
+if exist "backend\start.bat" (
+    start "Movie Madders Backend" cmd /k "cd backend && start.bat"
+) else (
+    echo [ERROR] backend\start.bat not found!
+    pause
+    exit /b 1
+)
 
 echo.
 echo [2/2] Starting Frontend Server...
@@ -18,4 +26,5 @@ IF NOT EXIST "node_modules" (
 
 echo.
 echo Starting Next.js Dev Server...
+echo Access the app at http://localhost:3000
 call bun run dev

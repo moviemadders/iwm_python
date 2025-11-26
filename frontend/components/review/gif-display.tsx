@@ -17,16 +17,24 @@ export function GifDisplay({ gifUrl, onRemove, className = "" }: GifDisplayProps
             exit={{ opacity: 0, scale: 0.9 }}
             className={`relative group ${className}`}
         >
-            <div className="relative rounded-lg overflow-hidden bg-siddu-bg-subtle border border-siddu-border-subtle">
+            <div className="relative rounded-lg overflow-hidden bg-siddu-bg-subtle border border-siddu-border-subtle min-h-[200px] flex items-center justify-center">
                 <img
                     src={gifUrl}
                     alt="Selected GIF"
-                    className="w-full max-h-64 object-contain"
+                    className="w-full h-auto max-h-80 object-contain"
+                    onError={(e) => {
+                        console.error("Error loading GIF:", gifUrl)
+                        e.currentTarget.style.display = 'none'
+                    }}
                 />
                 <button
-                    onClick={onRemove}
-                    className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        onRemove()
+                    }}
+                    className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-2 opacity-100 shadow-lg transition-transform hover:scale-110 z-10"
                     aria-label="Remove GIF"
+                    title="Remove GIF"
                 >
                     <X className="w-4 h-4" />
                 </button>

@@ -22,6 +22,7 @@ export function ProfileNavigation({ activeSection, onSectionChange, stats, isOwn
 
   const sections = [
     { id: "overview", label: "Overview" },
+    { id: "pulse", label: "Pulse" },
     { id: "reviews", label: "Reviews", count: stats.reviews },
     { id: "watchlist", label: "Watchlist", count: stats.watchlist },
     { id: "favorites", label: "Favorites", count: stats.favorites },

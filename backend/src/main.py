@@ -58,6 +58,8 @@ from .routers import festivals as festivals_router  # Film festivals (Cannes, Su
 from .routers import scene_explorer as scene_explorer_router  # Movie scenes
 from .routers import visual_treats as visual_treats_router  # Visually stunning scenes
 from .routers import pulse as pulse_router  # Social features (posts, likes, comments)
+from .routers import pulse_notifications as pulse_notifications_router  # Pulse notifications
+from .routers import messages as messages_router  # Direct messaging
 from .routers import quiz as quiz_router  # Movie quizzes
 from .routers import talent_hub as talent_hub_router  # Casting calls and opportunities
 from .routers import admin as admin_router  # Admin panel features
@@ -73,6 +75,7 @@ from .routers import critic_pinned as critic_pinned_router  # Critic Hub - Pinne
 from .routers import critic_affiliate as critic_affiliate_router  # Critic Hub - Affiliate links
 from .routers import critic_brand_deals as critic_brand_deals_router  # Critic Hub - Brand deals
 from .routers import users as users_router  # User profiles
+from .routers import user_stats as user_stats_router  # User activity stats
 from .routers import roles as roles_router  # Role management (multi-role profiles)
 from .routers import user_roles as user_roles_router  # User roles switcher
 from .routers import tmdb_admin as tmdb_admin_router  # TMDB Admin - Browse and import movies
@@ -226,35 +229,26 @@ For Beginners:
 - allow_headers: Which HTTP headers are allowed
 """
 
-# CORS Configuration - ALWAYS use specific origins with credentials enabled
-# Never use wildcard '*' when credentials are needed
-_allowed_origins = settings.cors_origins
-_allow_credentials = True
+# CORS Configuration
+# Explicitly allow localhost:3000 for development
+_allowed_origins = ["http://localhost:3000"]
+if settings.cors_origins:
+    _allowed_origins.extend([o for o in settings.cors_origins if o != "http://localhost:3000"])
 
-# Warn if using default CORS origins (helps catch misconfiguration)
-if _allowed_origins == ["http://localhost:3000"]:
-    log.warning(
-        "cors_using_defaults",
-        message="Using default CORS origins. Set CORS_ORIGINS environment variable for production.",
-        origins=_allowed_origins
-    )
+# Deduplicate
+_allowed_origins = list(set(_allowed_origins))
 
-# Add CORS middleware to the application
-# Middleware: Code that runs before/after each request
-# NOTE: We explicitly set allow_origin_regex to None to prevent wildcard behavior
+print(f"DEBUG: Setting CORS origins to: {_allowed_origins}")
+
 app.add_middleware(
-    CORSMiddleware,  # The CORS middleware class
-    allow_origins=_allowed_origins,  # Which origins can call this API (from environment variable)
-    allow_credentials=_allow_credentials,  # Whether to allow cookies/auth
-    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"],  # Allow all HTTP headers
-    allow_origin_regex=None,  # Explicitly disable regex matching
-    expose_headers=[],  # No custom exposed headers
-    max_age=600,  # Cache preflight requests for 10 minutes
+    CORSMiddleware,
+    allow_origins=_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# Log the CORS configuration for debugging
-log.info("cors_config", origins=_allowed_origins, allow_credentials=_allow_credentials)
+log.info("cors_config", origins=_allowed_origins, allow_credentials=True)
 
 """
 API Router Registration
@@ -306,6 +300,7 @@ api.include_router(notifications_router.router)  # GET /api/v1/notifications - N
 api.include_router(roles_router.router)  # GET/PUT /api/v1/roles - Role management
 api.include_router(user_roles_router.router)  # GET/POST /api/v1/users/me/roles - Role switcher
 api.include_router(upload_router.router)  # POST /api/v1/upload/avatar - File uploads
+api.include_router(user_stats_router.router)  # GET /api/v1/users/{id}/stats/* - User activity stats
 
 
 # Industry Features
@@ -320,6 +315,8 @@ api.include_router(visual_treats_router.router)  # GET /api/v1/visual-treats - S
 
 # Social Features
 api.include_router(pulse_router.router)  # GET /api/v1/pulse - Social posts
+api.include_router(pulse_notifications_router.router)  # GET /api/v1/pulse/notifications - Pulse notifications
+api.include_router(messages_router.router)  # POST /api/v1/messages - Direct messaging
 
 # Interactive Features
 api.include_router(quiz_router.router)  # GET /api/v1/quiz - Movie quizzes

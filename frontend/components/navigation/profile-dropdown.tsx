@@ -114,7 +114,7 @@ export function ProfileDropdown() {
         {availableRoles && availableRoles.length > 0 && (
           <>
             <div className="px-2 py-2 text-xs text-gray-400">Switch Role</div>
-            {availableRoles.map((role) => (
+            {availableRoles.map((role: any) => (
               <DropdownMenuItem
                 key={role.role}
                 onClick={() => switchRole(role.role as any)}
@@ -153,8 +153,7 @@ export function ProfileDropdown() {
         {isAdmin && (
           <Link href="/admin" passHref legacyBehavior>
             <DropdownMenuItem className="cursor-pointer hover:bg-[#3A3A3A] focus:bg-[#3A3A3A]">
-              <ShieldCheck className="mr-2 h-4 w-4 text-red-400" />
-              <span className="text-red-400">Admin Panel</span>
+              <span className="text-red-400">Admin Dashboard</span>
             </DropdownMenuItem>
           </Link>
         )}

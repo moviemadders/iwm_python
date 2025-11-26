@@ -65,6 +65,7 @@ class AuthMeResponse(BaseModel):
     username: str
     name: str
     avatar_url: str | None = None
+    banner_url: str | None = None
     roles: list[str] = []
     has_critic_profile: bool = False
     has_talent_profile: bool = False
@@ -78,11 +79,23 @@ async def signup(body: SignupBody, session: AsyncSession = Depends(get_session))
     existing = (await session.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+    
+    # Generate default avatar using DiceBear (random selection from 4 presets)
+    import random
+    default_avatars = [
+        "https://api.dicebear.com/9.x/adventurer/svg?seed=Felix",
+        "https://api.dicebear.com/9.x/adventurer/svg?seed=Aneka",
+        "https://api.dicebear.com/9.x/adventurer/svg?seed=Zack",
+        "https://api.dicebear.com/9.x/adventurer/svg?seed=Midnight"
+    ]
+    default_avatar = random.choice(default_avatars)
+    
     user = User(
         external_id=body.email,  # use email as external_id for now
         email=body.email,
         name=body.name,
         hashed_password=hash_password(body.password),
+        avatar_url=default_avatar,
     )
     session.add(user)
     await session.flush()

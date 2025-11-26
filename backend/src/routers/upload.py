@@ -176,3 +176,59 @@ async def upload_banner(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload to Cloudinary: {str(e)}",
         )
+@router.post("/media", response_model=UploadResponse)
+async def upload_media(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    Upload media file (image/video) to Cloudinary for Pulse posts.
+    
+    Requirements:
+    - Must be authenticated
+    - Image or Video file
+    - Max file size: 10MB
+    """
+    # Validate file type (allow videos too)
+    ALLOWED_MEDIA_TYPES = {
+        "image/jpeg", "image/png", "image/webp", "image/gif",
+        "video/mp4", "video/webm", "video/quicktime"
+    }
+    if file.content_type not in ALLOWED_MEDIA_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_MEDIA_TYPES)}",
+        )
+
+    # Check file size (10MB limit for media)
+    MAX_MEDIA_SIZE = 10 * 1024 * 1024
+    content = await file.read()
+    file_size = len(content)
+    
+    if file_size > MAX_MEDIA_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File too large. Maximum size is {MAX_MEDIA_SIZE / (1024 * 1024):.1f}MB",
+        )
+
+    try:
+        await file.seek(0)
+        resource_type = "video" if file.content_type.startswith("video/") else "image"
+        
+        result = cloudinary.uploader.upload(
+            file.file,
+            folder="pulse_media",
+            public_id=f"media_{current_user.id}_{uuid.uuid4()}",
+            resource_type=resource_type
+        )
+        
+        return UploadResponse(
+            url=result.get("secure_url"),
+            filename=result.get("public_id"),
+            size=file_size,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload to Cloudinary: {str(e)}",
+        )

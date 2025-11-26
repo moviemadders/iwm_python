@@ -198,6 +198,7 @@ class ReviewRepository:
                 "id": movie.external_id,
                 "title": movie.title,
             },
+            "gifUrl": review.gif_url,
         }
 
     async def update(
@@ -248,6 +249,7 @@ class ReviewRepository:
             "rating": review.rating,
             "date": review.date.isoformat(),
             "hasSpoilers": review.has_spoilers,
+            "gifUrl": review.gif_url,
         }
 
     async def delete(self, review_id: str, user_id: int) -> bool:

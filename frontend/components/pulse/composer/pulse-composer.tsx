@@ -16,6 +16,7 @@ import EmojiPickerButton from './emoji-picker-button'
 import TagSearchButton from './tag-search-button'
 import TagChip from './tag-chip'
 import PostButton from './post-button'
+import { MovieAutocomplete } from './movie-autocomplete'
 import { me } from '@/lib/auth'
 import { createPulse } from '@/lib/api/pulses'
 import { useToast } from '@/hooks/use-toast'
@@ -49,6 +50,8 @@ export default function PulseComposer({
   const [isPosting, setIsPosting] = useState(false)
   const [selectedRole, setSelectedRole] = useState<string>("")
   const [starRating, setStarRating] = useState<number>(0)
+  const [userRoles, setUserRoles] = useState<string[]>([])
+  const [selectedMovie, setSelectedMovie] = useState<{ id: string; title: string; posterUrl?: string; releaseYear?: number } | null>(null)
   const { toast } = useToast()
 
   const MAX_CHARS = 280 // Changed from 500 to 280 as per requirements
@@ -61,6 +64,27 @@ export default function PulseComposer({
       try {
         const user = await me()
         setAuthUser(user)
+        
+        // Fetch user roles
+        const rolesRes = await fetch('http://localhost:8000/api/v1/roles', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          }
+        })
+        if (rolesRes.ok) {
+          const rolesData = await rolesRes.json()
+          const roleMapping: Record<string, string> = {
+            'critic': 'critic',
+            'industry': 'industry_pro',
+            'talent': 'talent_pro'
+          }
+          const available = rolesData.roles
+            .filter((r: any) => r.enabled)
+            .map((r: any) => roleMapping[r.role_type])
+            .filter((r: string) => r !== undefined)
+          
+          setUserRoles(available)
+        }
       } catch (error) {
         console.debug("User not authenticated")
       }
@@ -78,8 +102,8 @@ export default function PulseComposer({
       const hashtagRegex = /#(\w+)/g
       const hashtags = content.match(hashtagRegex) || []
 
-      // Get linked movie ID from tagged items
-      const linkedMovieId = taggedItems.find(tag => tag.type === 'movie')?.id
+      // Get linked movie ID from selected movie
+      const linkedMovieId = selectedMovie?.id
 
       // Prepare media URLs
       const contentMedia = media.length > 0 ? media.map(m => m.url) : undefined
@@ -90,7 +114,7 @@ export default function PulseComposer({
         contentMedia,
         linkedMovieId,
         hashtags,
-        postedAsRole: selectedRole || undefined,
+        postedAsRole: (selectedRole && selectedRole !== "personal") ? selectedRole : undefined,
         starRating: (selectedRole && linkedMovieId && starRating > 0) ? starRating : undefined,
       })
 
@@ -108,6 +132,7 @@ export default function PulseComposer({
       setTaggedItems([])
       setSelectedRole("")
       setStarRating(0)
+      setSelectedMovie(null)
       setIsExpanded(false)
 
       // Notify parent to refresh feed
@@ -161,10 +186,10 @@ export default function PulseComposer({
             <SelectValue placeholder="Post as..." />
           </SelectTrigger>
           <SelectContent className="bg-[#282828] border-[#3A3A3A] text-white">
-            <SelectItem value="personal">Personal</SelectItem>
-            <SelectItem value="critic">As Critic 🎬</SelectItem>
-            <SelectItem value="industry_pro">As Filmmaker 🎥</SelectItem>
-            <SelectItem value="talent_pro">As Talent 🌟</SelectItem>
+            <SelectItem value="personal">🎬 Movie Lover</SelectItem>
+            {userRoles.includes('critic') && <SelectItem value="critic">⭐ As Critic</SelectItem>}
+            {userRoles.includes('industry_pro') && <SelectItem value="industry_pro">🎥 As Filmmaker</SelectItem>}
+            {userRoles.includes('talent_pro') && <SelectItem value="talent_pro">🌟 As Talent</SelectItem>}
           </SelectContent>
         </Select>
       </div>
@@ -196,6 +221,23 @@ export default function PulseComposer({
             )}
           </AnimatePresence>
 
+          {/* Movie Link */}
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+              >
+                <MovieAutocomplete
+                  onSelectMovie={(movie) => setSelectedMovie(movie)}
+                  selectedMovie={selectedMovie}
+                  onClear={() => setSelectedMovie(null)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Tagged Items */}
           <AnimatePresence>
             {taggedItems.length > 0 && (
@@ -218,7 +260,7 @@ export default function PulseComposer({
 
           {/* Star Rating Input */}
           <AnimatePresence>
-            {taggedItems.some(t => t.type === 'movie') && selectedRole && selectedRole !== "personal" && (
+            {selectedMovie && selectedRole && selectedRole !== "personal" && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}

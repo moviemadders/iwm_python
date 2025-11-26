@@ -58,6 +58,7 @@ async def get_feed(
     hashtag: Optional[str] = Query(None),
     linkedMovieId: Optional[str] = Query(None),
     linkedType: Optional[str] = Query(None),
+    userId: Optional[str] = Query(None),
     session: AsyncSession = Depends(get_session),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
@@ -74,7 +75,8 @@ async def get_feed(
         viewer_external_id=viewerId,
         hashtag=hashtag,
         linked_movie_id=linkedMovieId,
-        linked_type=linkedType
+        linked_type=linkedType,
+        target_user_external_id=userId
     )
 
 
@@ -97,12 +99,14 @@ async def create_pulse(
     """Create a new pulse"""
     # Verify user has claimed role if posting as professional
     if body.postedAsRole:
-        user_roles = await get_user_roles(current_user.id, session)
-        if body.postedAsRole not in user_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"User does not have '{body.postedAsRole}' role. Available roles: {user_roles}"
-            )
+        if body.postedAsRole and body.postedAsRole != "personal":
+            # Verify user has this role enabled
+            user_roles = await get_user_roles(current_user.id, session)
+            if body.postedAsRole not in user_roles:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"User does not have '{body.postedAsRole}' role. Available roles: {user_roles}"
+                )
     
     repo = PulseRepository(session)
     try:
@@ -122,7 +126,9 @@ async def create_pulse(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=500, detail="Failed to create pulse")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create pulse: {str(e)}")
 
 
 @router.delete("/{pulse_id}")
@@ -451,4 +457,89 @@ async def delete_share(
         )
     await session.commit()
     return None
+
+
+# === COMMENT ENDPOINTS ===
+
+class CommentCreateBody(BaseModel):
+    content: str = Field(..., min_length=1, max_length=500)
+
+
+@router.post("/{pulse_id}/comments")
+async def create_comment(
+    pulse_id: str,
+    body: CommentCreateBody,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a new comment on a pulse"""
+    from ..repositories.pulse_comments import PulseCommentRepository
+    
+    repo = PulseRepository(session)
+    comment_repo = PulseCommentRepository(session)
+    
+    pulse = await repo.get_by_id(pulse_id)
+    if not pulse:
+        raise HTTPException(status_code=404, detail="Pulse not found")
+    
+    comment = await comment_repo.create_comment(
+        pulse_id=pulse["id"],
+        user_id=current_user.id,
+        content=body.content
+    )
+    
+    await session.commit()
+    return comment
+
+
+@router.get("/{pulse_id}/comments")
+async def list_comments(
+    pulse_id: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+):
+    """List comments for a pulse with pagination"""
+    from ..repositories.pulse_comments import PulseCommentRepository
+    
+    repo = PulseRepository(session)
+    comment_repo = PulseCommentRepository(session)
+    
+    pulse = await repo.get_by_id(pulse_id)
+    if not pulse:
+        raise HTTPException(status_code=404, detail="Pulse not found")
+    
+    comments = await comment_repo.list_comments(pulse_id=pulse["id"], page=page, limit=limit)
+    total = await comment_repo.get_comment_count(pulse["id"])
+    
+    return {
+        "comments": comments,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "hasMore": (page * limit) < total
+    }
+
+
+@router.delete("/{pulse_id}/comments/{comment_id}")
+async def delete_comment(
+    pulse_id: str,
+    comment_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a comment (only by owner)"""
+    from ..repositories.pulse_comments import PulseCommentRepository
+    
+    comment_repo = PulseCommentRepository(session)
+    
+    try:
+        deleted = await comment_repo.delete_comment(comment_id=comment_id, user_id=current_user.id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        
+        await session.commit()
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
 

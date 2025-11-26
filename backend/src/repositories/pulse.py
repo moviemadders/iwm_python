@@ -67,6 +67,7 @@ class PulseRepository:
         hashtag: Optional[str] = None,
         linked_movie_id: Optional[str] = None,
         linked_type: Optional[str] = None,
+        target_user_external_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         q = self._base_query()
 
@@ -121,6 +122,15 @@ class PulseRepository:
         # Filter by linked content type
         if linked_type:
             q = q.where(Pulse.linked_type == linked_type)
+
+        # Filter by target user (profile page)
+        if target_user_external_id:
+            target_user_res = await self.session.execute(select(User.id).where(User.external_id == target_user_external_id))
+            target_user_id = target_user_res.scalar_one_or_none()
+            if target_user_id:
+                q = q.where(Pulse.user_id == target_user_id)
+            else:
+                return [] # User not found, return empty list
 
         # Window handling
         now = datetime.utcnow()
@@ -280,15 +290,6 @@ class PulseRepository:
         posted_as_role: Optional[str] = None,
         star_rating: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Create a new pulse"""
-        # Validate content length
-        if len(content_text) > 280:
-            raise ValueError("Content text must be 280 characters or less")
-
-        # Validate role
-        if posted_as_role and posted_as_role not in ['critic', 'industry_pro', 'talent_pro']:
-            raise ValueError(f"Invalid role: {posted_as_role}. Must be 'critic', 'industry_pro', or 'talent_pro'")
-
         # Validate star rating
         if star_rating is not None:
             if not posted_as_role:
@@ -308,6 +309,35 @@ class PulseRepository:
             if movie:
                 movie_id_db = movie.id
 
+
+        # Parse mentions (@movie) and hashtags (#topic) from content
+        import re
+        mentioned_movies = []
+        hashtags_parsed = []
+        
+        # Extract @mentions (movie references)
+        mention_pattern = r'@([A-Za-z0-9]+(?:[A-Za-z0-9\s]*[A-Za-z0-9])?)'
+        mentions = re.findall(mention_pattern, content_text)
+        if mentions:
+            for mention in mentions:
+                title = mention.strip()
+                # Try to find movie by title
+                movie_res = await self.session.execute(
+                    select(Movie).where(func.lower(Movie.title) == title.lower()).limit(1)
+                )
+                movie = movie_res.scalar_one_or_none()
+                if movie:
+                    mentioned_movies.append({
+                        "id": movie.external_id,
+                        "title": movie.title,
+                        "mention": f"@{title}"
+                    })
+        
+        # Extract #hashtags (topic tags) - exclude @mentions
+        hashtag_pattern = r'#(\w+)'
+        found_tags = re.findall(hashtag_pattern, content_text)
+        hashtags_parsed = list(set(found_tags)) if found_tags else (hashtags or [])
+
         # Create pulse
         pulse = Pulse(
             external_id=str(uuid.uuid4()),
@@ -315,7 +345,8 @@ class PulseRepository:
             content_text=content_text,
             content_media=json.dumps(content_media) if content_media else None,
             linked_movie_id=movie_id_db,
-            hashtags=json.dumps(hashtags) if hashtags else None,
+            hashtags=json.dumps(hashtags_parsed) if hashtags_parsed else None,
+            mentioned_movies=mentioned_movies if mentioned_movies else None,
             posted_as_role=posted_as_role,
             star_rating=star_rating,
             reactions_json="{}",

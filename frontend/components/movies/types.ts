@@ -4,15 +4,17 @@ export interface Movie {
   posterUrl?: string
   year?: string
   genres?: string[]
+  genreSlugs?: string[]
   sidduScore?: number
   popularity?: number
   director?: string
   cast?: string[]
-  runtime?: string
+  runtime?: number
   country?: string
   language?: string
   status?: string
   synopsis?: string
+  overview?: string
   streamingOptions?: {
     [region: string]: {
       id: string

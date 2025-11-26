@@ -16,6 +16,10 @@ interface Pulse {
   timestamp: string
   content: string
   hashtags: string[]
+  contentMedia?: string[]
+  linkedMovieId?: string
+  linkedMovieTitle?: string
+  linkedMoviePoster?: string
   likes: number
   comments: number
   shares: number
@@ -124,6 +128,60 @@ export function PulseCard({ pulse }: PulseCardProps) {
             <div className="text-[#E0E0E0] font-dmsans" dangerouslySetInnerHTML={{ __html: formattedContent }} />
           )}
         </div>
+
+        {/* Media Gallery */}
+        {pulse.contentMedia && pulse.contentMedia.length > 0 && (
+          <div className={`mb-3 overflow-hidden rounded-lg ${pulse.contentMedia.length === 1 ? "max-h-96" : "grid grid-cols-2 gap-2"}`}>
+            {pulse.contentMedia.map((mediaUrl, index) => {
+              const isVideo = mediaUrl.match(/\.(mp4|webm|ogg|mov)$/i);
+              return (
+                <div key={index} className="relative bg-[#1A1A1A] overflow-hidden rounded-lg">
+                  {isVideo ? (
+                    <video
+                      src={mediaUrl}
+                      controls
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Image
+                      src={mediaUrl}
+                      alt={`Media ${index + 1}`}
+                      width={pulse.contentMedia!.length === 1 ? 600 : 300}
+                      height={pulse.contentMedia!.length === 1 ? 400 : 200}
+                      className="w-full h-full object-cover"
+                      unoptimized
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Linked Movie */}
+        {pulse.linkedMovieId && pulse.linkedMovieTitle && (
+          <Link href={`/movies/${pulse.linkedMovieId}`}>
+            <div className="mb-3 p-3 bg-[#1A1A1A] rounded-lg border border-[#3A3A3A] hover:border-[#00BFFF] transition-colors cursor-pointer">
+              <div className="flex items-center space-x-3">
+                {pulse.linkedMoviePoster && (
+                  <div className="flex-shrink-0 w-12 h-16 rounded overflow-hidden">
+                    <Image
+                      src={pulse.linkedMoviePoster}
+                      alt={pulse.linkedMovieTitle}
+                      width={48}
+                      height={64}
+                      className="object-cover"
+                    />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <p className="text-[#E0E0E0] font-inter font-medium">{pulse.linkedMovieTitle}</p>
+                  <p className="text-[#A0A0A0] text-sm font-dmsans">View movie</p>
+                </div>
+              </div>
+            </div>
+          </Link>
+        )}
 
         {/* Card Footer */}
         <div className="flex items-center justify-between mt-4">

@@ -95,7 +95,7 @@ export async function updateUserProfile(userId: string, data: {
   avatarUrl?: string
   bannerUrl?: string
 }) {
-  const response = await fetch(`${API_BASE}/api/v1/auth/me`, {
+  const response = await fetch(`${API_BASE}/api/v1/users/me`, {
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify({
@@ -103,8 +103,8 @@ export async function updateUserProfile(userId: string, data: {
       bio: data.bio,
       location: data.location,
       website: data.website,
-      avatar_url: data.avatarUrl,
-      banner_url: data.bannerUrl,
+      avatarUrl: data.avatarUrl,
+      bannerUrl: data.bannerUrl,
     }),
   })
 
@@ -229,10 +229,11 @@ export async function getUserHistory(userId: string, page: number = 1, limit: nu
  */
 export async function getUserActivity(userId: string, page: number = 1, limit: number = 20) {
   try {
-    // For now, we'll combine recent reviews and watchlist additions
-    const [reviews, watchlist] = await Promise.all([
+    // Combine recent reviews, watchlist additions, and pulses
+    const [reviews, watchlist, pulses] = await Promise.all([
       getUserReviews(userId, 1, 10),
       getUserWatchlist(userId, 1, 10),
+      import("./pulses").then(m => m.getFeed({ userId, limit: 10 })).catch(() => []),
     ])
 
     // Transform into activity feed format
@@ -248,6 +249,13 @@ export async function getUserActivity(userId: string, page: number = 1, limit: n
         type: "watchlist",
         timestamp: item.dateAdded,
         data: item,
+      })),
+      ...pulses.map((pulse: any) => ({
+        id: `pulse-${pulse.id}`,
+        type: "pulse",
+        timestamp: pulse.timestamp,
+        content: pulse.content.text,
+        data: pulse,
       })),
     ]
 

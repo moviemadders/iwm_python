@@ -12,13 +12,14 @@ import { ProfileFavorites } from "@/components/profile/sections/profile-favorite
 import { ProfileCollections } from "@/components/profile/sections/profile-collections"
 import { ProfileHistory } from "@/components/profile/sections/profile-history"
 import { ProfileSettings } from "@/components/profile/sections/profile-settings"
+import { ProfilePulses } from "@/components/profile/sections/profile-pulses"
 import { Loader2 } from "lucide-react"
 import { updateUserProfile } from "@/lib/api/profile"
 import { useToast } from "@/hooks/use-toast"
 import { getCurrentUser } from "@/lib/auth"
 import { getApiUrl } from "@/lib/api-config"
 
-type ProfileSection = "overview" | "reviews" | "watchlist" | "favorites" | "collections" | "history" | "settings"
+type ProfileSection = "overview" | "pulse" | "reviews" | "watchlist" | "favorites" | "collections" | "history" | "settings"
 
 interface UserData {
   id: string
@@ -58,7 +59,6 @@ export default function UserProfilePage() {
     name: string
     bio: string
     location?: string
-    website?: string
     website?: string
     avatarUrl?: string
     bannerUrl?: string
@@ -209,7 +209,7 @@ export default function UserProfilePage() {
   // Allow deep-linking to specific section via ?section=...
   useEffect(() => {
     const sectionParam = (searchParams?.get('section') || '').toLowerCase()
-    const valid = ["overview", "reviews", "watchlist", "favorites", "collections", "playlists", "history", "settings"] as const
+    const valid = ["overview", "pulse", "reviews", "watchlist", "favorites", "collections", "playlists", "history", "settings"] as const
     if (sectionParam && (valid as readonly string[]).includes(sectionParam) && sectionParam !== activeSection) {
       setActiveSection(sectionParam as ProfileSection)
     }
@@ -221,6 +221,8 @@ export default function UserProfilePage() {
     switch (activeSection) {
       case "overview":
         return <ProfileOverview userId={userData.id} />
+      case "pulse":
+        return <ProfilePulses userId={userData.id} />
       case "reviews":
 
         return <ProfileReviews userId={userData.id} />

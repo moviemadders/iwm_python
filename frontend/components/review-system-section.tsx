@@ -336,159 +336,156 @@ export function ReviewSystemSection({ movie }: ReviewSystemSectionProps) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {reviews.map((review, index) => (
-          <motion.div key={review.id} variants={itemVariants} custom={index} transition={{ delay: 0.2 + index * 0.1 }}>
-            <Card className="bg-[#282828] border-none shadow-md hover:bg-[#2A2A2A] transition-colors">
-              <div className="p-6">
-                {/* Review Header */}
-                <div className="flex items-start mb-4">
-                  <div className="flex-shrink-0 mr-3">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-[#3A3A3A]">
-                      {review.avatarUrl ? (
-                        <Image
-                          src={review.avatarUrl || "/placeholder.svg"}
-                          alt={review.username}
-                          width={40}
-                          height={40}
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[#A0A0A0]">
-                          {review.username.charAt(0).toUpperCase()}
-                        </div>
-                      )}
+            <motion.div key={review.id} variants={itemVariants} custom={index} transition={{ delay: 0.2 + index * 0.1 }}>
+              <Card className="bg-[#282828] border-none shadow-md hover:bg-[#2A2A2A] transition-colors">
+                <div className="p-6">
+                  {/* Review Header */}
+                  <div className="flex items-start mb-4">
+                    <div className="flex-shrink-0 mr-3">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-[#3A3A3A]">
+                        {review.avatarUrl ? (
+                          <Image
+                            src={review.avatarUrl || "/placeholder.svg"}
+                            alt={review.username}
+                            width={40}
+                            height={40}
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[#A0A0A0]">
+                            {review.username.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center mb-1">
+                        <h4 className="font-inter font-medium text-[#E0E0E0] mr-2">{review.username}</h4>
+                        {review.verified && (
+                          <div className="bg-[#00BFFF]/10 text-[#00BFFF] text-xs px-2 py-0.5 rounded-full flex items-center">
+                            <Check className="w-3 h-3 mr-1" />
+                            <span>Verified</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center">
+                        <div className="flex mr-3">{renderStars(review.rating)}</div>
+                        <span className="text-[#A0A0A0] text-sm font-dmsans">{review.date}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center mb-1">
-                      <h4 className="font-inter font-medium text-[#E0E0E0] mr-2">{review.username}</h4>
-                      {review.verified && (
-                        <div className="bg-[#00BFFF]/10 text-[#00BFFF] text-xs px-2 py-0.5 rounded-full flex items-center">
-                          <Check className="w-3 h-3 mr-1" />
-                          <span>Verified</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center">
-                      <div className="flex mr-3">{renderStars(review.rating)}</div>
-                      <span className="text-[#A0A0A0] text-sm font-dmsans">{review.date}</span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Review Content */}
-                <div className="mb-4">
-                  {review.containsSpoilers && !visibleSpoilers[review.id] ? (
-                    <div className="bg-[#1A1A1A] p-4 rounded-md">
-                      <p className="text-[#A0A0A0] font-dmsans mb-2">This review contains spoilers</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-[#3A3A3A] text-[#E0E0E0] hover:bg-[#3A3A3A] font-dmsans"
-                        onClick={() => toggleSpoilerVisibility(review.id)}
-                      >
-                        Show Spoilers
-                      </Button>
-                    </div>
-                  ) : (
-                    <div>
-                      <p
-                        className={`text-[#E0E0E0] font-dmsans ${
-                          !expandedReviews[review.id] && review.content.length > 300 ? "line-clamp-4" : ""
-                        }`}
-                      >
-                        {review.content}
-                      </p>
-                      {review.content.length > 300 && (
-                        <button
-                          onClick={() => toggleExpandReview(review.id)}
-                          className="text-[#00BFFF] hover:text-[#00A3DD] transition-colors mt-2 font-dmsans text-sm flex items-center"
-                        >
-                          {expandedReviews[review.id] ? (
-                            <>
-                              Show Less <ChevronUp className="ml-1 w-4 h-4" />
-                            </>
-                          ) : (
-                            <>
-                              Read More <ChevronDown className="ml-1 w-4 h-4" />
-                            </>
-                          )}
-                        </button>
-                      )}
-                      {review.containsSpoilers && visibleSpoilers[review.id] && (
+                  {/* Review Content */}
+                  <div className="mb-4">
+                    {review.containsSpoilers && !visibleSpoilers[review.id] ? (
+                      <div className="bg-[#1A1A1A] p-4 rounded-md">
+                        <p className="text-[#A0A0A0] font-dmsans mb-2">This review contains spoilers</p>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="border-[#3A3A3A] text-[#E0E0E0] hover:bg-[#3A3A3A] font-dmsans mt-2"
+                          className="border-[#3A3A3A] text-[#E0E0E0] hover:bg-[#3A3A3A] font-dmsans"
                           onClick={() => toggleSpoilerVisibility(review.id)}
                         >
-                          Hide Spoilers
+                          Show Spoilers
                         </Button>
-                      )}
+                      </div>
+                    ) : (
+                      <div>
+                        <p
+                          className={`text-[#E0E0E0] font-dmsans ${!expandedReviews[review.id] && review.content.length > 300 ? "line-clamp-4" : ""
+                            }`}
+                        >
+                          {review.content}
+                        </p>
+                        {review.content.length > 300 && (
+                          <button
+                            onClick={() => toggleExpandReview(review.id)}
+                            className="text-[#00BFFF] hover:text-[#00A3DD] transition-colors mt-2 font-dmsans text-sm flex items-center"
+                          >
+                            {expandedReviews[review.id] ? (
+                              <>
+                                Show Less <ChevronUp className="ml-1 w-4 h-4" />
+                              </>
+                            ) : (
+                              <>
+                                Read More <ChevronDown className="ml-1 w-4 h-4" />
+                              </>
+                            )}
+                          </button>
+                        )}
+                        {review.containsSpoilers && visibleSpoilers[review.id] && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-[#3A3A3A] text-[#E0E0E0] hover:bg-[#3A3A3A] font-dmsans mt-2"
+                            onClick={() => toggleSpoilerVisibility(review.id)}
+                          >
+                            Hide Spoilers
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Review Footer */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-dmsans text-[#A0A0A0]">Was this review helpful?</div>
+                    <div className="flex items-center gap-4">
+                      <button
+                        className={`flex items-center gap-1 ${reviewVotes[review.id] === "helpful" ? "text-[#00BFFF]" : "text-[#A0A0A0]"
+                          } hover:text-[#00BFFF] transition-colors`}
+                        onClick={() => handleVote(review.id, "helpful")}
+                      >
+                        <ThumbsUp className="w-4 h-4" />
+                        <span>{review.helpfulCount + (reviewVotes[review.id] === "helpful" ? 1 : 0)}</span>
+                      </button>
+                      <button
+                        className={`flex items-center gap-1 ${reviewVotes[review.id] === "unhelpful" ? "text-[#FF4500]" : "text-[#A0A0A0]"
+                          } hover:text-[#FF4500] transition-colors`}
+                        onClick={() => handleVote(review.id, "unhelpful")}
+                      >
+                        <ThumbsDown className="w-4 h-4" />
+                        <span>{review.unhelpfulCount + (reviewVotes[review.id] === "unhelpful" ? 1 : 0)}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Edit/Delete Buttons - Only show if user owns the review */}
+                  {currentUser?.id === review.userId && (
+                    <div className="flex gap-2 pt-3 border-t border-[#3A3A3A] mt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingReview(review)}
+                        className="flex-1 border-[#3A3A3A] hover:bg-[#3A3A3A]"
+                      >
+                        <Pencil className="w-3 h-3 mr-2" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteReview(review.id)}
+                        disabled={deletingReviewId === review.id}
+                        className="flex-1"
+                      >
+                        {deletingReviewId === review.id ? (
+                          <>
+                            <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="w-3 h-3 mr-2" />
+                            Delete
+                          </>
+                        )}
+                      </Button>
                     </div>
                   )}
                 </div>
-
-                {/* Review Footer */}
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-dmsans text-[#A0A0A0]">Was this review helpful?</div>
-                  <div className="flex items-center gap-4">
-                    <button
-                      className={`flex items-center gap-1 ${
-                        reviewVotes[review.id] === "helpful" ? "text-[#00BFFF]" : "text-[#A0A0A0]"
-                      } hover:text-[#00BFFF] transition-colors`}
-                      onClick={() => handleVote(review.id, "helpful")}
-                    >
-                      <ThumbsUp className="w-4 h-4" />
-                      <span>{review.helpfulCount + (reviewVotes[review.id] === "helpful" ? 1 : 0)}</span>
-                    </button>
-                    <button
-                      className={`flex items-center gap-1 ${
-                        reviewVotes[review.id] === "unhelpful" ? "text-[#FF4500]" : "text-[#A0A0A0]"
-                      } hover:text-[#FF4500] transition-colors`}
-                      onClick={() => handleVote(review.id, "unhelpful")}
-                    >
-                      <ThumbsDown className="w-4 h-4" />
-                      <span>{review.unhelpfulCount + (reviewVotes[review.id] === "unhelpful" ? 1 : 0)}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Edit/Delete Buttons - Only show if user owns the review */}
-                {currentUser?.id === review.userId && (
-                  <div className="flex gap-2 pt-3 border-t border-[#3A3A3A] mt-3">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setEditingReview(review)}
-                      className="flex-1 border-[#3A3A3A] hover:bg-[#3A3A3A]"
-                    >
-                      <Pencil className="w-3 h-3 mr-2" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDeleteReview(review.id)}
-                      disabled={deletingReviewId === review.id}
-                      className="flex-1"
-                    >
-                      {deletingReviewId === review.id ? (
-                        <>
-                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                          Deleting...
-                        </>
-                      ) : (
-                        <>
-                          <Trash2 className="w-3 h-3 mr-2" />
-                          Delete
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </Card>
-          </motion.div>
+              </Card>
+            </motion.div>
           ))}
         </div>
       )}

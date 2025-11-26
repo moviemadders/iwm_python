@@ -4,17 +4,16 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Star, ThumbsUp, ThumbsDown, MessageCircle, CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, Pencil, Trash2, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import type { UserReviewCardProps } from "@/types/review-page"
 import { me } from "@/lib/auth"
-import { deleteReview } from "@/lib/api/reviews"
+import { deleteReview, voteOnReview, removeVote, getUserVote } from "@/lib/api/reviews"
 import { useToast } from "@/hooks/use-toast"
 import { EditReviewModal } from "@/components/reviews/edit-review-modal"
 
 export default function UserReviewCardV2({
     review,
     isCurrentUser,
-    onHelpfulClick,
-    onUnhelpfulClick,
 }: UserReviewCardProps) {
     const [isExpanded, setIsExpanded] = useState(false)
     const [isSpoilerRevealed, setIsSpoilerRevealed] = useState(false)
@@ -25,46 +24,106 @@ export default function UserReviewCardV2({
     const [isDeleting, setIsDeleting] = useState(false)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [gifLoaded, setGifLoaded] = useState(false)
+    const [isVoting, setIsVoting] = useState(false)
     const { toast } = useToast()
 
+    // Fetch current user and their vote on mount
     useEffect(() => {
-        const fetchUser = async () => {
+        const fetchUserAndVote = async () => {
             try {
                 const user = await me()
                 setCurrentUser(user)
+
+                // Fetch user's vote if authenticated
+                try {
+                    const voteData = await getUserVote(String(review.id))
+                    setUserVote(voteData.voteType)
+                } catch (error) {
+                    console.debug("No vote found or error fetching vote")
+                }
             } catch (error) {
                 console.debug("User not authenticated")
             }
         }
-        fetchUser()
-    }, [])
+        fetchUserAndVote()
+    }, [review.id])
 
-    const handleHelpfulClick = () => {
-        if (userVote === "helpful") {
-            setHelpfulCount(helpfulCount - 1)
-            setUserVote(null)
-        } else {
-            if (userVote === "unhelpful") {
-                setUnhelpfulCount(unhelpfulCount - 1)
-            }
-            setHelpfulCount(helpfulCount + 1)
-            setUserVote("helpful")
+    const handleHelpfulClick = async () => {
+        if (!currentUser) {
+            toast({
+                title: "Login Required",
+                description: "Please log in to vote on reviews",
+                variant: "destructive",
+            })
+            return
         }
-        onHelpfulClick(review.id)
+
+        if (isVoting) return
+        setIsVoting(true)
+
+        try {
+            // Toggle vote if same type, otherwise change vote
+            if (userVote === "helpful") {
+                await removeVote(String(review.id))
+                setHelpfulCount(prev => Math.max(0, prev - 1))
+                setUserVote(null)
+            } else {
+                await voteOnReview(String(review.id), "helpful")
+                if (userVote === "unhelpful") {
+                    setUnhelpfulCount(prev => Math.max(0, prev - 1))
+                }
+                setHelpfulCount(prev => prev + 1)
+                setUserVote("helpful")
+            }
+        } catch (error) {
+            console.error("Error voting:", error)
+            toast({
+                title: "Vote Failed",
+                description: "Failed to register your vote. Please try again.",
+                variant: "destructive",
+            })
+        } finally {
+            setIsVoting(false)
+        }
     }
 
-    const handleUnhelpfulClick = () => {
-        if (userVote === "unhelpful") {
-            setUnhelpfulCount(unhelpfulCount - 1)
-            setUserVote(null)
-        } else {
-            if (userVote === "helpful") {
-                setHelpfulCount(helpfulCount - 1)
-            }
-            setUnhelpfulCount(unhelpfulCount + 1)
-            setUserVote("unhelpful")
+    const handleUnhelpfulClick = async () => {
+        if (!currentUser) {
+            toast({
+                title: "Login Required",
+                description: "Please log in to vote on reviews",
+                variant: "destructive",
+            })
+            return
         }
-        onUnhelpfulClick(review.id)
+
+        if (isVoting) return
+        setIsVoting(true)
+
+        try {
+            // Toggle vote if same type, otherwise change vote
+            if (userVote === "unhelpful") {
+                await removeVote(String(review.id))
+                setUnhelpfulCount(prev => Math.max(0, prev - 1))
+                setUserVote(null)
+            } else {
+                await voteOnReview(String(review.id), "unhelpful")
+                if (userVote === "helpful") {
+                    setHelpfulCount(prev => Math.max(0, prev - 1))
+                }
+                setUnhelpfulCount(prev => prev + 1)
+                setUserVote("unhelpful")
+            }
+        } catch (error) {
+            console.error("Error voting:", error)
+            toast({
+                title: "Vote Failed",
+                description: "Failed to register your vote. Please try again.",
+                variant: "destructive",
+            })
+        } finally {
+            setIsVoting(false)
+        }
     }
 
     const handleDelete = async () => {
@@ -74,7 +133,7 @@ export default function UserReviewCardV2({
 
         setIsDeleting(true)
         try {
-            await deleteReview(review.id)
+            await deleteReview(String(review.id))
             toast({
                 title: "Success",
                 description: "Review deleted successfully",
@@ -120,8 +179,8 @@ export default function UserReviewCardV2({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
             className={`group relative bg-gradient-to-br from-[#2A2A2A] to-[#1E1E1E] rounded-2xl border transition-all duration-300 hover:shadow-2xl hover:shadow-[#00D4FF]/10 ${isCurrentUser
-                    ? "border-[#00D4FF] shadow-[0_0_20px_rgba(0,212,255,0.3)]"
-                    : "border-[#404040] hover:border-[#00D4FF]/50"
+                ? "border-[#00D4FF] shadow-[0_0_20px_rgba(0,212,255,0.3)]"
+                : "border-[#404040] hover:border-[#00D4FF]/50"
                 }`}
         >
             {/* Current User Badge */}
@@ -281,8 +340,8 @@ export default function UserReviewCardV2({
                                 whileTap={{ scale: 0.95 }}
                                 onClick={handleHelpfulClick}
                                 className={`flex items-center gap-2 text-base font-medium transition-all ${userVote === "helpful"
-                                        ? "text-[#10B981]"
-                                        : "text-[#B0B0B0] hover:text-[#10B981]"
+                                    ? "text-[#10B981]"
+                                    : "text-[#B0B0B0] hover:text-[#10B981]"
                                     }`}
                             >
                                 <ThumbsUp className={`w-5 h-5 ${userVote === "helpful" ? "fill-current" : ""}`} />
@@ -295,8 +354,8 @@ export default function UserReviewCardV2({
                                 whileTap={{ scale: 0.95 }}
                                 onClick={handleUnhelpfulClick}
                                 className={`flex items-center gap-2 text-base font-medium transition-all ${userVote === "unhelpful"
-                                        ? "text-[#EF4444]"
-                                        : "text-[#B0B0B0] hover:text-[#EF4444]"
+                                    ? "text-[#EF4444]"
+                                    : "text-[#B0B0B0] hover:text-[#EF4444]"
                                     }`}
                             >
                                 <ThumbsDown className={`w-5 h-5 ${userVote === "unhelpful" ? "fill-current" : ""}`} />
@@ -304,14 +363,17 @@ export default function UserReviewCardV2({
                             </motion.button>
 
                             {/* Comments */}
-                            <div className="flex items-center gap-2 text-base text-[#B0B0B0]">
+                            <Link
+                                href={`/movies/${review.movie_id}/reviews/${review.id}`}
+                                className="flex items-center gap-2 text-base text-[#B0B0B0] hover:text-[#00D4FF] transition-colors cursor-pointer relative z-10"
+                            >
                                 <MessageCircle className="w-5 h-5" />
                                 <span>{review.comment_count}</span>
-                            </div>
+                            </Link>
                         </div>
 
                         {/* Edit/Delete Buttons */}
-                        {currentUser?.id === review.user.id && (
+                        {String(currentUser?.id) === String(review.user.username) && (
                             <div className="flex gap-2">
                                 <Button
                                     size="sm"
@@ -351,7 +413,7 @@ export default function UserReviewCardV2({
             {isEditModalOpen && (
                 <EditReviewModal
                     review={{
-                        id: review.id,
+                        id: String(review.id),
                         title: "",
                         content: review.content,
                         rating: review.rating,

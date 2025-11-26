@@ -10,7 +10,7 @@ import { MediaUploader } from "./media-uploader"
 import { ReviewGuidelines } from "./review-guidelines"
 import { ActionButtons } from "./action-buttons"
 import { useToast } from "@/hooks/use-toast"
-import { submitReview } from "@/lib/api/reviews"
+import { submitReview, updateReview } from "@/lib/api/reviews"
 import { getCurrentUser } from "@/lib/auth"
 import { useRouter } from "next/navigation"
 import { GifPicker } from "./gif-picker"
@@ -21,18 +21,25 @@ interface MovieReviewCreationProps {
   onSubmit?: (review: any) => void
   onCancel: () => void
   isModal?: boolean
+  initialData?: {
+    rating: number
+    content: string
+    hasSpoilers: boolean
+    gifUrl?: string | null
+  }
+  reviewId?: string
 }
 
-export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false }: MovieReviewCreationProps) {
+export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false, initialData, reviewId }: MovieReviewCreationProps) {
   const { toast } = useToast()
   const router = useRouter()
-  const [rating, setRating] = useState(0)
-  const [reviewText, setReviewText] = useState("")
-  const [containsSpoilers, setContainsSpoilers] = useState(false)
+  const [rating, setRating] = useState(initialData?.rating || 0)
+  const [reviewText, setReviewText] = useState(initialData?.content || "")
+  const [containsSpoilers, setContainsSpoilers] = useState(initialData?.hasSpoilers || false)
   const [uploadedMedia, setUploadedMedia] = useState<File[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDraft, setIsDraft] = useState(false)
-  const [selectedGif, setSelectedGif] = useState<string | null>(null)
+  const [selectedGif, setSelectedGif] = useState<string | null>(initialData?.gifUrl || null)
   const [isGifPickerOpen, setIsGifPickerOpen] = useState(false)
 
   const isVerified = true // Mock verification status
@@ -60,7 +67,6 @@ export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false
     setIsSubmitting(true)
 
     try {
-      // Check if user is authenticated
       const user = await getCurrentUser()
 
       if (!user) {
@@ -69,17 +75,15 @@ export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false
           description: "Please log in to submit a review.",
           variant: "destructive",
         })
-        // Redirect to login with return URL
-        router.push(`/login?redirect=/movies/${movie.id}/review/create`)
+        router.push(`/login?redirect=/movies/${movie.id}/review/${reviewId ? 'edit' : 'create'}`)
         return
       }
 
-      console.log("Submitting review for movie:", movie.id)
+      console.log(reviewId ? "Updating review:" : "Submitting review for movie:", reviewId || movie.id)
       console.log("User:", user.username)
       console.log("Rating:", rating)
       console.log("Review length:", reviewText.length)
 
-      // Submit review to backend API
       const reviewData = {
         content: reviewText,
         rating: rating,
@@ -87,22 +91,26 @@ export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false
         gifUrl: selectedGif,
       }
 
-      const result = await submitReview(movie.id, reviewData, user.id)
+      let result
+      if (reviewId) {
+        console.log("Updating review:", reviewId)
+        result = await updateReview(reviewId, reviewData)
+      } else {
+        console.log("Creating new review")
+        result = await submitReview(movie.id, reviewData, user.id)
+      }
 
-      console.log("Review submitted successfully:", result)
+      console.log("Review submitted/updated successfully:", result)
 
-      // Show success toast
       toast({
-        title: "Review Published!",
-        description: "Your review has been successfully posted.",
+        title: reviewId ? "Review Updated!" : "Review Published!",
+        description: reviewId ? "Your review has been successfully updated." : "Your review has been successfully posted.",
       })
 
-      // Call onSubmit callback if provided (for modal usage)
       if (onSubmit) {
         onSubmit(result)
       }
 
-      // Redirect to movie page to see the review
       router.push(`/movies/${movie.id}`)
 
     } catch (error) {
@@ -120,7 +128,6 @@ export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false
 
   const handleSaveDraft = () => {
     setIsDraft(true)
-    // Save to localStorage or API
     localStorage.setItem(
       `review-draft-${movie.id}`,
       JSON.stringify({
@@ -153,7 +160,7 @@ export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false
       opacity: 1,
       y: 0,
       transition: {
-        type: "spring",
+        type: "spring" as const,
         stiffness: 100,
       },
     },
@@ -172,7 +179,9 @@ export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false
 
       <div className="p-6 md:p-8 space-y-6">
         <motion.div variants={itemVariants}>
-          <h2 className="text-2xl font-bold text-siddu-text-light mb-2">Write Your Review</h2>
+          <h2 className="text-2xl font-bold text-siddu-text-light mb-2">
+            {reviewId ? "Edit Your Review" : "Write Your Review"}
+          </h2>
           <p className="text-siddu-text-subtle">Share your thoughts on {movie.title}</p>
         </motion.div>
 
@@ -184,10 +193,19 @@ export function MovieReviewCreation({ movie, onSubmit, onCancel, isModal = false
           <ReviewEditor value={reviewText} onChange={setReviewText} movieTitle={movie.title} />
         </motion.div>
 
-        {/* GIF Display */}
+        {/* GIF Display - Explicitly rendered when selectedGif is present */}
         {selectedGif && (
-          <motion.div variants={itemVariants}>
-            <GifDisplay gifUrl={selectedGif} onRemove={() => setSelectedGif(null)} />
+          <motion.div
+            variants={itemVariants}
+            className="w-full flex justify-center py-4"
+          >
+            <GifDisplay
+              gifUrl={selectedGif}
+              onRemove={() => {
+                console.log("Removing GIF")
+                setSelectedGif(null)
+              }}
+            />
           </motion.div>
         )}
 

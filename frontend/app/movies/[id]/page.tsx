@@ -19,6 +19,9 @@ import { AddToCollectionModal } from "@/components/profile/collections/add-to-co
 import { addToFavorites, removeFromFavorites, getFavorites } from "@/lib/api/favorites"
 import { getApiUrl } from "@/lib/api-config"
 import { TrailerModal } from "@/components/ui/trailer-modal"
+import { getMoviePulses } from "@/lib/api/pulses"
+import { formatDistanceToNow } from "date-fns"
+import { getMoviesByGenre } from "@/lib/api"
 
 // Fallback mock movie data (used when backend is unavailable)
 const fallbackMovieData = {
@@ -658,6 +661,7 @@ export default function MovieDetailsPage({ params }: { params: Promise<{ id: str
 
                 // Fetch reviews to calculate rating distribution
                 let ratingDistribution = fallbackMovieData.ratingDistribution
+                let sentimentAnalysis = fallbackMovieData.sentimentAnalysis
                 let reviewCount = 0
                 try {
                     const reviewsResponse = await fetch(`${apiBase}/api/v1/reviews?movieId=${movieId}&limit=1000`)
@@ -683,10 +687,62 @@ export default function MovieDetailsPage({ params }: { params: Promise<{ id: str
                                 rating: Number.parseInt(rating),
                                 count,
                             })).reverse() // Sort from 10 to 1
+
+                            // Calculate sentiment analysis
+                            let pos = 0, neu = 0, neg = 0
+                            reviews.forEach((r: any) => {
+                                const rating = r.rating || 0
+                                if (rating >= 7) pos++
+                                else if (rating >= 5) neu++
+                                else neg++
+                            })
+
+                            sentimentAnalysis = {
+                                positive: Math.round((pos / reviewCount) * 100),
+                                neutral: Math.round((neu / reviewCount) * 100),
+                                negative: Math.round((neg / reviewCount) * 100),
+                                keyPhrases: fallbackMovieData.sentimentAnalysis.keyPhrases
+                            }
                         }
                     }
                 } catch (reviewError) {
                     console.error("Error fetching reviews for rating distribution:", reviewError)
+                    console.error("Error fetching reviews for rating distribution:", reviewError)
+                }
+
+                // Fetch pulses
+                let pulses: any[] = []
+                try {
+                    const pulsesData = await getMoviePulses(movieId)
+                    if (Array.isArray(pulsesData)) {
+                        pulses = pulsesData.map((p: any) => ({
+                            id: p.id,
+                            userId: p.userId,
+                            username: p.userInfo.username,
+                            isVerified: p.userInfo.isVerified,
+                            avatarUrl: p.userInfo.avatarUrl,
+                            timestamp: formatDistanceToNow(new Date(p.timestamp), { addSuffix: true }),
+                            content: p.content.text,
+                            hashtags: p.content.hashtags || [],
+                            likes: p.engagement.reactions.total,
+                            comments: p.engagement.comments,
+                            shares: p.engagement.shares,
+                            userHasLiked: !!p.engagement.userReaction,
+                        }))
+                    }
+                } catch (pulseError) {
+                    console.error("Error fetching pulses:", pulseError)
+                }
+
+                // Fetch related movies
+                let relatedMovies: any[] = []
+                try {
+                    if (data.genreSlugs && data.genreSlugs.length > 0) {
+                        const related = await getMoviesByGenre(data.genreSlugs[0], { limit: 5 })
+                        relatedMovies = related.filter((m: any) => m.id !== data.id).slice(0, 4)
+                    }
+                } catch (relatedError) {
+                    console.error("Error fetching related movies:", relatedError)
                 }
 
                 // Transform backend data to match component expectations
@@ -703,7 +759,7 @@ export default function MovieDetailsPage({ params }: { params: Promise<{ id: str
                     criticsScore: data.criticsScore || 0,
                     reviewCount,
                     ratingDistribution,
-                    sentimentAnalysis: fallbackMovieData.sentimentAnalysis, // TODO: Calculate from reviews
+                    sentimentAnalysis: sentimentAnalysis,
                     synopsis: data.synopsis || data.overview || "",
                     directors: data.directors || [],
                     writers: data.writers || [],
@@ -711,8 +767,8 @@ export default function MovieDetailsPage({ params }: { params: Promise<{ id: str
                     genres: data.genres || [],
                     cast: data.cast || [],
                     streamingOptions: data.streamingOptions || {},
-                    relatedMovies: [], // TODO: Fetch related movies
-                    pulses: [], // TODO: Fetch pulses
+                    relatedMovies: relatedMovies,
+                    pulses: pulses,
                 }
 
                 setMovieData(transformedData)

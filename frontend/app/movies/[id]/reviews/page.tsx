@@ -136,6 +136,7 @@ export default function ReviewsPage() {
             comment_count: review.commentCount || 0,
             created_at: review.date,
             user_vote: null,
+            gif_url: review.gifUrl || null,
           }))
 
           // Movie context already set from movieData fetch above

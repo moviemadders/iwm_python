@@ -199,7 +199,7 @@ async def seed_movies(session: AsyncSession, genres: list):
             imdb_rating=movie_data["imdb_rating"],
             country="USA",
             language="English",
-            poster_url=f"https://image.tmdb.org/t/p/w500/placeholder_{random.randint(1,100)}.jpg",
+            poster_url=f"https://placehold.co/500x750?text=Movie+{i}",
             backdrop_url=f"https://image.tmdb.org/t/p/original/backdrop_{random.randint(1,100)}.jpg",
             release_date=datetime(int(movie_data["year"]), 1, 1),
             status="released",

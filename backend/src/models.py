@@ -847,6 +847,7 @@ class Pulse(Base):
     linked_movie: Mapped["Movie | None"] = relationship(lazy="selectin")
 
     hashtags: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON array of strings
+    mentioned_movies: Mapped[List[dict] | None] = mapped_column(JSONB, nullable=True)  # JSON array of movie mentions
 
     # Role-based posting fields
     posted_as_role: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)  # 'critic', 'industry_pro', 'talent_pro', NULL

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import type { Review } from "./types"
 import { formatDate } from "@/lib/utils"
 import { me } from "@/lib/auth"
-import { deleteReview } from "@/lib/api/reviews"
+import { deleteReview, voteOnReview, removeVote, getUserVote } from "@/lib/api/reviews"
 import { useToast } from "@/hooks/use-toast"
 import { EditReviewModal } from "./edit-review-modal"
 
@@ -40,14 +40,60 @@ export function ReviewCard({ review, onReviewUpdated }: ReviewCardProps) {
     fetchUser()
   }, [])
 
+  useEffect(() => {
+    if (currentUser) {
+      getUserVote(review.id)
+        .then((data) => {
+          if (data.voteType === "helpful") setIsHelpful(true)
+          else if (data.voteType === "unhelpful") setIsHelpful(false)
+          else setIsHelpful(null)
+        })
+        .catch((err) => console.error("Error fetching vote:", err))
+    }
+  }, [currentUser, review.id])
+
   // Truncate review text if needed
   const shouldTruncate = review.content.length > 200
   const truncatedContent = shouldTruncate && !isExpanded ? `${review.content.substring(0, 200)}...` : review.content
 
   // Handle helpful/unhelpful votes
-  const handleHelpfulVote = (helpful: boolean) => {
-    setIsHelpful(helpful)
-    // In a real app, this would send the vote to the server
+  const handleHelpfulVote = async (helpful: boolean) => {
+    // If not logged in, maybe show login modal? For now just return
+    if (!currentUser) return
+
+    const previousVote = isHelpful
+    const newVote = helpful
+
+    // Optimistic update
+    if (previousVote === newVote) {
+      // Toggle off if clicking same vote
+      setIsHelpful(null)
+    } else {
+      setIsHelpful(newVote)
+    }
+
+    try {
+      if (previousVote === newVote) {
+        // Remove vote
+        await removeVote(review.id)
+      } else {
+        // Set vote
+        await voteOnReview(review.id, newVote ? "helpful" : "unhelpful")
+      }
+
+      // Notify parent to refresh counts if needed, or we could update local counts
+      if (onReviewUpdated) onReviewUpdated()
+
+    } catch (error) {
+      console.error("Failed to vote:", error)
+      // Revert on error
+      setIsHelpful(previousVote)
+      toast({
+        title: "Error",
+        description: "Failed to submit vote. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleDelete = async () => {
@@ -207,7 +253,7 @@ export function ReviewCard({ review, onReviewUpdated }: ReviewCardProps) {
           </div>
           <Link
             href={`/movies/${review.movie.id}/reviews/${review.id}`}
-            className="flex items-center text-xs text-siddu-text-subtle hover:text-siddu-text-light"
+            className="flex items-center text-xs text-siddu-text-subtle hover:text-siddu-electric-blue transition-colors cursor-pointer relative z-10"
           >
             <MessageCircle size={14} className="mr-1" />
             <span>{review.commentCount}</span>
@@ -215,7 +261,7 @@ export function ReviewCard({ review, onReviewUpdated }: ReviewCardProps) {
         </div>
 
         {/* Edit/Delete Buttons - Only show if user owns the review */}
-        {currentUser?.id === review.author.id && (
+        {currentUser && currentUser.externalId === review.author.id && (
           <div className="flex gap-2 pt-2 border-t border-siddu-border-subtle">
             <Button
               size="sm"

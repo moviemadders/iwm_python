@@ -180,6 +180,7 @@ class MovieRepository:
             "posterUrl": m.poster_url,
             "backdropUrl": m.backdrop_url,
             "genres": [g.name for g in m.genres],
+            "genreSlugs": [g.slug for g in m.genres],
             "sidduScore": m.siddu_score,
             "criticsScore": m.critics_score,
             "imdbRating": m.imdb_rating,
