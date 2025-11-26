@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { X } from "lucide-react"
 import { getApiUrl } from "@/lib/api-config"
-import { getCurrentUser } from "@/lib/auth"
+import { getCurrentUser, getAccessToken } from "@/lib/auth"
 import { VideoPlayer } from "./video-player"
 import { MovieMaddersIntro } from "./movie-madders-intro"
 import { useWatchHistory } from "@/hooks/useWatchHistory"
@@ -74,7 +74,7 @@ export function MoviePlayerModal({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${getAccessToken()}`,
         },
         body: JSON.stringify({
           progress_seconds: Math.floor(currentSeconds),
