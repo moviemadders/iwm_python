@@ -38,6 +38,7 @@ export async function getFeed(params: {
   limit?: number
   hashtag?: string
   linkedMovieId?: string
+  userId?: string
 } = {}) {
   const searchParams = new URLSearchParams()
   if (params.filter) searchParams.append("filter", params.filter)
@@ -46,6 +47,7 @@ export async function getFeed(params: {
   if (params.limit) searchParams.append("limit", params.limit.toString())
   if (params.hashtag) searchParams.append("hashtag", params.hashtag)
   if (params.linkedMovieId) searchParams.append("linkedMovieId", params.linkedMovieId)
+  if (params.userId) searchParams.append("userId", params.userId)
 
   try {
     const response = await fetch(`${API_BASE}/api/v1/pulse/feed?${searchParams.toString()}`, {
@@ -112,6 +114,50 @@ export async function deletePulse(pulseId: string) {
     return response.json()
   } catch (error) {
     console.error("Error deleting pulse:", error)
+    throw error
+  }
+}
+
+/**
+ * Bookmark a pulse
+ */
+export async function bookmarkPulse(pulseId: string) {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/pulse/${pulseId}/bookmark`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || `Failed to bookmark pulse: ${response.statusText}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error("Error bookmarking pulse:", error)
+    throw error
+  }
+}
+
+/**
+ * Unbookmark a pulse
+ */
+export async function unbookmarkPulse(pulseId: string) {
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/pulse/${pulseId}/bookmark`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || `Failed to unbookmark pulse: ${response.statusText}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    console.error("Error unbookmarking pulse:", error)
     throw error
   }
 }

@@ -37,14 +37,22 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip"
 import { useMobile } from "@/hooks/use-mobile"
+import { renderParsedContent } from '@/lib/pulse/text-parser'
+import { useRouter } from 'next/navigation'
+import Link from "next/link"
+import PulseMediaGallery from "./pulse-media-gallery"
 
 
 interface PulseCardProps {
   pulse: any // TODO: Type properly
   onReaction: (pulseId: string, type: string) => void
+  onComment: (pulseId: string, content: string) => void
+  onShare: (pulseId: string, type: 'echo' | 'quote_echo', quoteContent?: string) => void
+  onBookmark: (pulseId: string) => void
 }
 
-export default function PulseCard({ pulse, onReaction }: PulseCardProps) {
+export default function PulseCard({ pulse, onReaction, onComment, onShare, onBookmark }: PulseCardProps) {
+  const router = useRouter()
   const [isExpanded, setIsExpanded] = useState(false)
   const [showReactions, setShowReactions] = useState(false)
   const [showShareOptions, setShowShareOptions] = useState(false)
@@ -91,7 +99,12 @@ export default function PulseCard({ pulse, onReaction }: PulseCardProps) {
 
   const handleBookmark = () => {
     setIsBookmarked(!isBookmarked)
-    // In a real app, this would call an API
+    onBookmark(pulse.id)
+  }
+
+  const handleShare = (type: 'echo' | 'quote_echo') => {
+    onShare(pulse.id, type)
+    setShowShareOptions(false)
   }
 
   const cardVariants = {
@@ -170,6 +183,26 @@ export default function PulseCard({ pulse, onReaction }: PulseCardProps) {
     )
   }
 
+  const [showCommentInput, setShowCommentInput] = useState(false)
+  const [commentText, setCommentText] = useState("")
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!commentText.trim()) return
+
+    setIsSubmittingComment(true)
+    try {
+      await onComment(pulse.id, commentText)
+      setCommentText("")
+      setShowCommentInput(false)
+    } catch (error) {
+      console.error("Failed to submit comment", error)
+    } finally {
+      setIsSubmittingComment(false)
+    }
+  }
+
   return (
     <motion.div
       className="bg-[#282828] rounded-lg p-3 sm:p-4 border border-[#3A3A3A]"
@@ -246,59 +279,64 @@ export default function PulseCard({ pulse, onReaction }: PulseCardProps) {
                 </button>
               </>
             ) : (
-              <p className="text-[#E0E0E0] whitespace-pre-line">
-                {pulse.content.text}
+              <div className="text-[#E0E0E0] whitespace-pre-line">
+                {renderParsedContent(
+                  pulse.content.text,
+                  (mention) => {
+                    // Navigate to movie page when clicking @mention
+                    if (mention.id) {
+                      router.push(`/movies/${mention.id}`)
+                    }
+                  },
+                  (tag) => {
+                    // Navigate to hashtag feed when clicking #hashtag  
+                    router.push(`/pulse?hashtag=${tag}`)
+                  }
+                )}
                 {isTextLong && isExpanded && (
                   <button className="text-[#00BFFF] text-sm hover:underline ml-2" onClick={() => setIsExpanded(false)}>
                     Show less
                   </button>
                 )}
-              </p>
+              </div>
             )}
           </div>
 
           {/* Media Content */}
           {pulse.content.media && pulse.content.media.length > 0 && (
-            <div className={`mb-3 grid ${pulse.content.media.length > 1 ? "grid-cols-2" : "grid-cols-1"} gap-2`}>
-              {pulse.content.media.map((item: any, index: number) => (
-                <div key={index} className="relative rounded-md overflow-hidden">
-                  <img
-                    src={item.url || "/placeholder.svg"}
-                    alt={`Media ${index + 1}`}
-                    className="w-full object-cover"
-                    style={{ maxHeight: pulse.content.media!.length > 1 ? "200px" : "400px" }}
-                  />
-                  {item.type === "video" && (
-                    <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                      Video
-                    </div>
-                  )}
-                </div>
-              ))}
+            <div className="mb-3">
+              <PulseMediaGallery media={pulse.content.media} />
             </div>
           )}
 
           {/* Linked Content */}
           {pulse.content.linkedContent && (
-            <div className="mb-3 bg-[#1A1A1A] rounded-md overflow-hidden border border-[#3A3A3A]">
-              <div className="flex">
-                {pulse.content.linkedContent.posterUrl && (
-                  <div className="w-20 h-20 flex-shrink-0">
-                    <img
-                      src={pulse.content.linkedContent.posterUrl || "/placeholder.svg"}
-                      alt={pulse.content.linkedContent.title}
-                      className="w-full h-full object-cover"
-                    />
+            <Link 
+              href={pulse.content.linkedContent.type === "movie" 
+                ? `/movies/${pulse.content.linkedContent.id}` 
+                : `/cricket/matches/${pulse.content.linkedContent.id}`}
+              className="block mb-3"
+            >
+              <div className="bg-[#1A1A1A] rounded-md overflow-hidden border border-[#3A3A3A] hover:border-[#00BFFF] transition-colors cursor-pointer">
+                <div className="flex">
+                  {pulse.content.linkedContent.posterUrl && (
+                    <div className="w-20 h-20 flex-shrink-0">
+                      <img
+                        src={pulse.content.linkedContent.posterUrl || "/placeholder.svg"}
+                        alt={pulse.content.linkedContent.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className="p-3">
+                    <div className="text-xs text-[#00BFFF] uppercase mb-1">
+                      {pulse.content.linkedContent.type === "movie" ? "Movie" : "Cricket Match"}
+                    </div>
+                    <div className="font-medium text-[#E0E0E0]">{pulse.content.linkedContent.title}</div>
                   </div>
-                )}
-                <div className="p-3">
-                  <div className="text-xs text-[#00BFFF] uppercase mb-1">
-                    {pulse.content.linkedContent.type === "movie" ? "Movie" : "Cricket Match"}
-                  </div>
-                  <div className="font-medium">{pulse.content.linkedContent.title}</div>
                 </div>
               </div>
-            </div>
+            </Link>
           )}
 
           {/* Hashtags */}
@@ -368,7 +406,12 @@ export default function PulseCard({ pulse, onReaction }: PulseCardProps) {
             </div>
 
             {/* Comment Button */}
-            <Button variant="ghost" size="sm" className="text-sm flex items-center gap-1 text-[#A0A0A0]">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-sm flex items-center gap-1 text-[#A0A0A0]"
+              onClick={() => setShowCommentInput(!showCommentInput)}
+            >
               <MessageCircle className="h-4 w-4" />
               {pulse.engagement.comments > 0 && (
                 <span>
@@ -411,22 +454,17 @@ export default function PulseCard({ pulse, onReaction }: PulseCardProps) {
                     <div className="space-y-1">
                       <button
                         className="flex items-center gap-2 w-full p-2 text-sm text-[#E0E0E0] hover:bg-[#282828] rounded-md"
+                        onClick={() => handleShare('echo')}
+                      >
+                        <Share className="h-4 w-4 text-green-500" />
+                        Echo
+                      </button>
+                      <button
+                        className="flex items-center gap-2 w-full p-2 text-sm text-[#E0E0E0] hover:bg-[#282828] rounded-md"
                         onClick={handleCopyLink}
                       >
                         {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                         {copied ? "Copied!" : "Copy link"}
-                      </button>
-                      <button className="flex items-center gap-2 w-full p-2 text-sm text-[#E0E0E0] hover:bg-[#282828] rounded-md">
-                        <Twitter className="h-4 w-4 text-[#1DA1F2]" />
-                        Share on Twitter
-                      </button>
-                      <button className="flex items-center gap-2 w-full p-2 text-sm text-[#E0E0E0] hover:bg-[#282828] rounded-md">
-                        <Facebook className="h-4 w-4 text-[#4267B2]" />
-                        Share on Facebook
-                      </button>
-                      <button className="flex items-center gap-2 w-full p-2 text-sm text-[#E0E0E0] hover:bg-[#282828] rounded-md">
-                        <Mail className="h-4 w-4 text-[#EA4335]" />
-                        Share via Email
                       </button>
                     </div>
                   </motion.div>
@@ -444,6 +482,36 @@ export default function PulseCard({ pulse, onReaction }: PulseCardProps) {
               <Bookmark className="h-4 w-4" />
             </Button>
           </div>
+
+          {/* Comment Input */}
+          <AnimatePresence>
+            {showCommentInput && (
+              <motion.form
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-3 flex gap-2"
+                onSubmit={handleCommentSubmit}
+              >
+                <input
+                  type="text"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Write a comment..."
+                  className="flex-1 bg-[#1A1A1A] border border-[#3A3A3A] rounded-full px-4 py-2 text-sm text-[#E0E0E0] focus:outline-none focus:border-[#00BFFF]"
+                  autoFocus
+                />
+                <Button 
+                  type="submit" 
+                  size="sm" 
+                  className="bg-[#00BFFF] text-black hover:bg-[#00BFFF]/90 rounded-full"
+                  disabled={!commentText.trim() || isSubmittingComment}
+                >
+                  Post
+                </Button>
+              </motion.form>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </motion.div>

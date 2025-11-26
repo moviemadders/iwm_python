@@ -80,6 +80,8 @@ export default function PulseFeed({
               pulse={post}
               onReaction={onLike}
               onComment={onComment}
+              onShare={onEcho}
+              onBookmark={onBookmark}
             />
           </motion.div>
         ))}
