@@ -41,7 +41,6 @@ export default function PulsePage() {
     is_loading_more: false,
   })
   const [isLoading, setIsLoading] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [trendingTopics, setTrendingTopics] = useState(mockTrendingTopics)
   const [currentUser, setCurrentUser] = useState<any>(mockCurrentUser) // Fallback to mock until loaded
 
@@ -161,25 +160,6 @@ export default function PulsePage() {
   // Refresh feed
   const refreshFeed = () => {
     fetchFeed(1, true)
-  }
-
-  // Handle new post submission
-  const handlePostSubmit = async (content: string, media: PulseMedia[], taggedItems: TaggedItem[]) => {
-    setIsSubmitting(true)
-    try {
-      await pulseApi.createPulse({
-        contentText: content,
-        contentMedia: media.map(m => typeof m === 'string' ? m : JSON.stringify(m)),
-        linkedMovieId: taggedItems.find(t => t.type === 'movie')?.id,
-        hashtags: content.match(/#[a-zA-Z0-9_]+/g) || []
-      })
-      refreshFeed()
-    } catch (err) {
-      console.error('Failed to create post:', err)
-      alert('Failed to create post')
-    } finally {
-      setIsSubmitting(false)
-    }
   }
 
   // Handle like
@@ -373,8 +353,6 @@ export default function PulsePage() {
             composer={
               <PulseComposer
                 currentUser={currentUser}
-                onSubmit={handlePostSubmit}
-                isSubmitting={isSubmitting}
                 onPulseCreated={refreshFeed}
               />
             }

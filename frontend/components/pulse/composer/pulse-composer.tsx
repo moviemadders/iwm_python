@@ -31,7 +31,7 @@ import { Star } from "lucide-react"
 
 interface PulseComposerProps {
   currentUser: CurrentUser
-  onSubmit: (content: string, media: PulseMedia[], taggedItems: TaggedItem[]) => void
+  onSubmit?: (content: string, media: PulseMedia[], taggedItems: TaggedItem[]) => void
   isSubmitting?: boolean
   onPulseCreated?: () => void
 }
@@ -122,9 +122,6 @@ export default function PulseComposer({
         title: "Success",
         description: "Pulse posted successfully",
       })
-
-      // Call original onSubmit for UI update
-      onSubmit(content, media, taggedItems)
 
       // Reset form
       setContent('')
