@@ -51,13 +51,13 @@ export function ProfileHistory({ userId }: ProfileHistoryProps) {
         return {
           id: item.id,
           movieId: item.movieId || item.movie?.id || "",
-          movieTitle: item.movie?.title || "Unknown Movie",
-          moviePosterUrl: item.movie?.posterUrl || "/placeholder.svg",
-          movieYear: String(item.movie?.year || ""),
+          movieTitle: item.title || item.movie?.title || "Unknown Movie",
+          moviePosterUrl: item.posterUrl || item.movie?.posterUrl || "/placeholder.svg",
+          movieYear: String(item.releaseDate || item.movie?.year || ""),
           watchedDate: watchedDate,
           formattedDate: formattedDate,
           userRating: item.rating,
-          genres: item.movie?.genres || [],
+          genres: item.genres || item.movie?.genres || [],
         }
       })
 

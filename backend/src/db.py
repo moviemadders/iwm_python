@@ -19,6 +19,7 @@ SessionLocal: async_sessionmaker[AsyncSession] | None = None
 async def init_db() -> None:
     global engine, SessionLocal
     if settings.database_url:
+        print(f"[DB DEBUG] Initializing DB with URL: {settings.database_url}")
         url = settings.database_url
         connect_args = {}
         

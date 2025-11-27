@@ -30,10 +30,22 @@ async def get_current_user(
     try:
         user_id = int(sub)
     except ValueError:
+        with open("C:/Users/bilva_labs/Videos/movie madders/backend/auth_debug.log", "a") as f:
+            f.write(f"[AUTH DEBUG] Invalid subject: {sub}\n")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid subject")
+    
+    with open("C:/Users/bilva_labs/Videos/movie madders/backend/auth_debug.log", "a") as f:
+        f.write(f"[AUTH DEBUG] Looking up user_id: {user_id}\n")
+    
     res = await session.execute(select(User).where(User.id == user_id))
     user = res.scalar_one_or_none()
+    
     if not user:
+        with open("C:/Users/bilva_labs/Videos/movie madders/backend/auth_debug.log", "a") as f:
+            f.write(f"[AUTH DEBUG] User not found for id: {user_id}\n")
+            # List all users to debug
+            all_users = await session.execute(select(User.id, User.email))
+            f.write(f"[AUTH DEBUG] All users: {all_users.all()}\n")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
 

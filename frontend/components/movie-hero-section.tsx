@@ -27,6 +27,7 @@ interface MovieHeroSectionProps {
   isFavorited?: boolean
   isTogglingFavorite?: boolean
   onPlayTrailer?: () => void
+  onWatchClick?: () => void
 }
 
 export function MovieHeroSection({
@@ -37,7 +38,8 @@ export function MovieHeroSection({
   onToggleFavorite,
   isFavorited = false,
   isTogglingFavorite = false,
-  onPlayTrailer
+  onPlayTrailer,
+  onWatchClick
 }: MovieHeroSectionProps) {
   const [expanded, setExpanded] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -177,6 +179,17 @@ export function MovieHeroSection({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: 0.5 }}
                 >
+                  {onWatchClick && (
+                    <motion.div whileTap={{ scale: 0.98 }} transition={{ duration: 0.15 }}>
+                      <Button
+                        className="w-full sm:w-auto bg-[#00BFFF] text-[#1A1A1A] hover:bg-[#00A3DD] font-inter font-bold"
+                        onClick={onWatchClick}
+                      >
+                        <Play className="mr-2 h-4 w-4 fill-current" />
+                        Watch Now
+                      </Button>
+                    </motion.div>
+                  )}
 
 
                   <motion.div whileTap={{ scale: 0.98 }} transition={{ duration: 0.15 }}>

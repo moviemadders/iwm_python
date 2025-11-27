@@ -202,6 +202,9 @@ class MovieRepository:
             "reviews": reviews_list,
             "scenes": scenes_list,
             "streamingOptions": streaming_by_region,
+            "videoUrl": m.video_url,
+            "videoSource": m.video_source,
+            "isFree": m.is_free,
         }
 
     async def search(

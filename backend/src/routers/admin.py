@@ -226,6 +226,10 @@ class MovieImportIn(BaseModel):
     awards: Optional[List[AwardSimpleIn]] = None
     trivia: Optional[List[TriviaIn]] = None
     timeline: Optional[List[TimelineIn]] = None
+    # Video playback fields
+    video_url: Optional[str] = None
+    video_source: Optional[str] = None
+    is_free: Optional[bool] = None
 
 # ---------- Enrichment (Gemini/TMDB) ----------
 class EnrichQueryIn(BaseModel):
@@ -427,6 +431,14 @@ async def import_movies_json(
                     movie.release_date = datetime.fromisoformat(m.release_date)
                 except Exception:
                     movie.release_date = None
+            
+            # Video playback fields
+            if m.video_url is not None:
+                movie.video_url = m.video_url
+            if m.video_source is not None:
+                movie.video_source = m.video_source
+            if m.is_free is not None:
+                movie.is_free = m.is_free
 
             # Ensure movie.id is available before linking associations
             await session.flush()

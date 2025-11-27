@@ -120,6 +120,11 @@ class Movie(Base):
     budget: Mapped[int | None] = mapped_column(Integer, nullable=True)
     revenue: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Video Content
+    video_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    video_source: Mapped[str | None] = mapped_column(String(20), nullable=True)  # youtube, direct, external
+    is_free: Mapped[bool] = mapped_column(Boolean, default=False)
+
     # Status
     status: Mapped[str | None] = mapped_column(String(20), nullable=True, default="released")  # released, upcoming, in-production
 
@@ -461,6 +466,11 @@ class Watchlist(Base):
     status: Mapped[str] = mapped_column(String(20), default="want-to-watch")  # want-to-watch, watching, watched
     priority: Mapped[str] = mapped_column(String(10), default="medium")  # high, medium, low
     progress: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    
+    # Progress Tracking
+    progress_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    total_duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_watched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id"))

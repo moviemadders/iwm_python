@@ -238,6 +238,64 @@ export function MovieBasicInfoForm({ movie, onFieldChange, onChanges }: MovieBas
             </Select>
           </div>
         </div>
+
+        {/* Video Playback Section */}
+        <div className="space-y-4 pt-4 border-t">
+          <h3 className="text-lg font-semibold">Video Playback</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="video-url">Video URL</Label>
+              <Input
+                id="video-url"
+                placeholder="https://www.youtube.com/watch?v=... or direct video URL"
+                value={(movie as any).videoUrl || ""}
+                onChange={(e) => {
+                  onFieldChange("videoUrl" as any, e.target.value)
+                  onChanges()
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                YouTube URL or direct video file URL
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="video-source">Video Source</Label>
+              <Select
+                value={(movie as any).videoSource || "youtube"}
+                onValueChange={(value) => {
+                  onFieldChange("videoSource" as any, value)
+                  onChanges()
+                }}
+              >
+                <SelectTrigger id="video-source">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="youtube">YouTube</SelectItem>
+                  <SelectItem value="direct">Direct Video</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="is-free"
+              checked={(movie as any).isFree || false}
+              onChange={(e) => {
+                onFieldChange("isFree" as any, e.target.checked)
+                onChanges()
+              }}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <Label htmlFor="is-free" className="cursor-pointer">
+              Free to watch (no subscription required)
+            </Label>
+          </div>
+        </div>
       </CardContent>
     </Card>
   )

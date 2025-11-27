@@ -90,3 +90,58 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Video.js Custom Styling */
+.video-js.vjs-movie-madders {
+    font-family: 'Inter', sans-serif;
+}
+
+.video-js.vjs-movie-madders .vjs-big-play-button {
+    background-color: rgba(229, 9, 20, 0.8); /* Netflix Red */
+    border: none;
+    border-radius: 50%;
+    width: 80px;
+    height: 80px;
+    line-height: 80px;
+    font-size: 40px;
+    margin-left: -40px;
+    margin-top: -40px;
+    transition: all 0.3s ease;
+}
+
+.video-js.vjs-movie-madders .vjs-big-play-button:hover {
+    background-color: rgba(229, 9, 20, 1);
+    transform: scale(1.1);
+}
+
+.video-js.vjs-movie-madders .vjs-control-bar {
+    background-color: rgba(0, 0, 0, 0.7);
+    height: 60px;
+    display: flex;
+    align-items: center;
+    z-index: 100; /* Ensure controls are above everything */
+    opacity: 1 !important; /* Force visibility */
+    visibility: visible !important;
+    transition: opacity 0.3s ease;
+}
+
+/* Hide controls when inactive/user inactive is handled by video.js adding vjs-user-inactive class */
+.video-js.vjs-movie-madders.vjs-user-inactive.vjs-playing .vjs-control-bar {
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+.video-js.vjs-movie-madders .vjs-play-progress {
+    background-color: #E50914; /* Netflix Red */
+}
+
+.video-js.vjs-movie-madders .vjs-slider {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* YouTube Branding Hack - Scale up slightly to hide top title bar */
+.video-js.vjs-movie-madders iframe {
+    transform: scale(1.05);
+    transform-origin: center;
+    pointer-events: auto; /* Allow interaction for now, or use overlay */
+}

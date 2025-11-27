@@ -85,108 +85,67 @@ from .routers import feature_flags as feature_flags_router  # Feature Flags - Ad
 from .routers import upload as upload_router  # File Upload - Avatar and banner images
 
 
-
 """
 Lifespan Context Manager
 
 This function manages the application's lifecycle - what happens when the app starts
 and what happens when it shuts down. This is a FastAPI best practice for managing
 resources like database connections, caches, and background tasks.
-
-Why use lifespan instead of @app.on_event("startup")?
-- Lifespan is the modern, recommended approach (FastAPI 0.93+)
-- Better error handling and cleanup guarantees
-- Supports async context managers properly
-- Ensures resources are cleaned up even if startup fails
-
-What happens during startup (before 'yield'):
-1. Set up structured logging
-2. Initialize database connection pool
-3. Export OpenAPI schema for frontend type generation
-
-What happens during shutdown (after 'yield'):
-4. Log shutdown event
-5. Database connections are automatically closed by SQLAlchemy
-
-For Beginners:
-- @asynccontextmanager: Decorator that creates an async context manager
-- yield: Separates startup code (before) from shutdown code (after)
-- await: Waits for async operations to complete before continuing
 """
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ========== STARTUP PHASE ==========
+    print("----------------------------------------------------------------")
+    print("STARTING UP MOVIE MADDERS BACKEND (DEBUG MODE)")
+    if settings.database_url:
+        print(f"DB URL: {settings.database_url}")
+    print("----------------------------------------------------------------")
 
     # Step 1: Configure structured logging
-    # This sets up JSON-formatted logs with timestamps, log levels, and context
     setup_logging(settings.log_level)
     log.info("starting_app", env=settings.env)
 
     # Step 2: Initialize database connection pool
-    # This creates a pool of reusable database connections for better performance
-    # Instead of creating a new connection for each request (slow), we reuse
-    # connections from the pool (fast)
     await init_db()
 
     # Step 3: Export OpenAPI schema (optional, for development)
-    # OpenAPI is a standard format for describing REST APIs
-    # We export it so the frontend can auto-generate TypeScript types
-    # This ensures frontend and backend stay in sync
     if settings.export_openapi_on_startup:
-        # Find the project root directory by looking for 'packages/shared' folder
-        here = Path(__file__).resolve()  # Current file path
+        here = Path(__file__).resolve()
         root = None
-
-        # Search up the directory tree to find project root
         try:
             for depth in range(2, 6):
                 if depth >= len(here.parents):
                     break
-                cand = here.parents[depth]  # Go up 'depth' levels
+                cand = here.parents[depth]
                 if (cand / "packages" / "shared").exists():
                     root = cand
                     break
         except Exception:
             pass
 
-        # Fallback if we can't find it
         if root is None:
-            root = here.parents[4]  # Assume 4 levels up
+            root = here.parents[4]
 
-        # Create the target path for OpenAPI JSON file
         target = root / "packages" / "shared" / "openapi" / "openapi.json"
-        target.parent.mkdir(parents=True, exist_ok=True)  # Create directories if needed
+        target.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write the OpenAPI schema to file
         with target.open("w", encoding="utf-8") as f:
             json.dump(app.openapi(), f, ensure_ascii=False, indent=2)
 
         log.info("openapi_exported", path=str(target))
 
     # ========== APPLICATION RUNNING ==========
-    # The 'yield' statement separates startup from shutdown
-    # Everything after this runs when the app is shutting down
     yield
 
     # ========== SHUTDOWN PHASE ==========
     log.info("stopping_app")
-    # Note: Database connections are automatically closed by SQLAlchemy's engine.dispose()
-    # which is called when the engine is garbage collected
 
 
 """
 FastAPI Application Initialization
 
 This section creates the main FastAPI application instance and configures it.
-
-Security Best Practice:
-- In production, we disable the auto-generated API documentation (/docs, /redoc)
-  to prevent exposing our API structure to potential attackers
-- In development, we keep docs enabled for easier testing and debugging
-
-For Beginners:
-- FastAPI automatically generates interactive API documentation (Swagger UI)
-- This is great for development but should be disabled in production
 """
 
 # Check if we're running in production environment
@@ -231,7 +190,7 @@ For Beginners:
 
 # CORS Configuration
 # Explicitly allow localhost:3000 for development
-_allowed_origins = ["http://localhost:3000"]
+_allowed_origins = ["http://localhost:3000", "http://10.27.212.129:3000"]
 if settings.cors_origins:
     _allowed_origins.extend([o for o in settings.cors_origins if o != "http://localhost:3000"])
 
@@ -360,6 +319,3 @@ For Beginners:
 - All database queries use async/await for better performance
 - Structured logging helps with debugging and monitoring
 """
-
-
-

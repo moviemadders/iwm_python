@@ -147,3 +147,17 @@ export async function isInWatchlist(userId: string, movieId: string): Promise<bo
   }
 }
 
+/**
+ * Get a specific watchlist item for a movie
+ */
+export async function getWatchlistItem(userId: string, movieId: string): Promise<any> {
+  try {
+    const watchlist = await getUserWatchlist(userId, 1, 1000)
+    const items = watchlist.items || watchlist || []
+    return items.find((item: any) => item.movieId === movieId || item.movie_id === movieId)
+  } catch (error) {
+    console.error("Error getting watchlist item:", error)
+    return null
+  }
+}
+

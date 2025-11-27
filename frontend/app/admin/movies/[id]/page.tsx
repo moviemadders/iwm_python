@@ -153,6 +153,10 @@ export default function MovieEditPage() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       importedFrom: "Gemini",
+      // Video playback fields
+      videoUrl: data.videoUrl || data.video_url || undefined,
+      videoSource: data.videoSource || data.video_source || "youtube",
+      isFree: data.isFree !== undefined ? data.isFree : (data.is_free !== undefined ? data.is_free : true),
     }
     return m
   }
@@ -312,6 +316,9 @@ export default function MovieEditPage() {
         })),
         trivia: trivia.length > 0 ? trivia : undefined,
         timeline: timeline.length > 0 ? timeline : undefined,
+        video_url: (movieData as any).videoUrl || undefined,
+        video_source: (movieData as any).videoSource || undefined,
+        is_free: (movieData as any).isFree !== undefined ? (movieData as any).isFree : undefined,
       }]
 
       const res = await fetch(`${apiBase}/api/v1/admin/movies/import`, {
@@ -508,6 +515,9 @@ export default function MovieEditPage() {
           quality: s.quality,
           url: s.url,
         })),
+        video_url: (movieData as any).videoUrl || undefined,
+        video_source: (movieData as any).videoSource || undefined,
+        is_free: (movieData as any).isFree !== undefined ? (movieData as any).isFree : undefined,
       }]
 
       const res = await fetch(`${apiBase}/api/v1/admin/movies/import`, {

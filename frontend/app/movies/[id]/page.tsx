@@ -13,7 +13,7 @@ import { MovieDetailsNavigation } from "@/components/movie-details-navigation"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { addToWatchlist } from "@/lib/api/watchlist"
+import { addToWatchlist, getWatchlistItem } from "@/lib/api/watchlist"
 import { getCurrentUser } from "@/lib/auth"
 import { AddToCollectionModal } from "@/components/profile/collections/add-to-collection-modal"
 import { addToFavorites, removeFromFavorites, getFavorites } from "@/lib/api/favorites"
@@ -22,6 +22,7 @@ import { TrailerModal } from "@/components/ui/trailer-modal"
 import { getMoviePulses } from "@/lib/api/pulses"
 import { formatDistanceToNow } from "date-fns"
 import { getMoviesByGenre } from "@/lib/api"
+import { MoviePlayerModal } from "@/components/movies/movie-player-modal"
 
 // Fallback mock movie data (used when backend is unavailable)
 const fallbackMovieData = {
@@ -469,6 +470,8 @@ export default function MovieDetailsPage({ params }: { params: Promise<{ id: str
     const [favoriteId, setFavoriteId] = useState<string | null>(null)
     const [showTrailerModal, setShowTrailerModal] = useState(false)
     const [trailerUrl, setTrailerUrl] = useState<string | null>(null)
+    const [showPlayerModal, setShowPlayerModal] = useState(false)
+    const [watchProgress, setWatchProgress] = useState(0)
     const { id: movieId } = usePromise(params)
     const { toast } = useToast()
 
@@ -745,6 +748,19 @@ export default function MovieDetailsPage({ params }: { params: Promise<{ id: str
                     console.error("Error fetching related movies:", relatedError)
                 }
 
+                // Fetch watch progress
+                try {
+                    const user = await getCurrentUser()
+                    if (user) {
+                        const watchItem = await getWatchlistItem(user.id, movieId)
+                        if (watchItem && watchItem.progress_seconds) {
+                            setWatchProgress(watchItem.progress_seconds)
+                        }
+                    }
+                } catch (progressError) {
+                    console.error("Error fetching watch progress:", progressError)
+                }
+
                 // Transform backend data to match component expectations
                 const transformedData = {
                     id: data.id,
@@ -769,6 +785,9 @@ export default function MovieDetailsPage({ params }: { params: Promise<{ id: str
                     streamingOptions: data.streamingOptions || {},
                     relatedMovies: relatedMovies,
                     pulses: pulses,
+                    videoUrl: data.videoUrl,
+                    videoSource: data.videoSource,
+                    isFree: data.isFree,
                 }
 
                 setMovieData(transformedData)
@@ -814,6 +833,7 @@ export default function MovieDetailsPage({ params }: { params: Promise<{ id: str
                 isFavorited={isFavorited}
                 isTogglingFavorite={isTogglingFavorite}
                 onPlayTrailer={handlePlayTrailer}
+                onWatchClick={movieData.videoUrl ? () => setShowPlayerModal(true) : undefined}
             />
 
             {/* Navigation */}
@@ -863,8 +883,18 @@ export default function MovieDetailsPage({ params }: { params: Promise<{ id: str
             <TrailerModal
                 isOpen={showTrailerModal}
                 onClose={() => setShowTrailerModal(false)}
-                videoUrl={trailerUrl}
+                trailerUrl={trailerUrl || ""}
+            />
+
+            <MoviePlayerModal
+                isOpen={showPlayerModal}
+                onClose={() => setShowPlayerModal(false)}
+                videoUrl={movieData.videoUrl || ""}
+                videoSource={movieData.videoSource || "youtube"}
+                movieId={movieId}
                 title={movieData.title}
+                initialProgress={watchProgress}
+                totalDuration={0}
             />
         </div>
     )
