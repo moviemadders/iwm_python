@@ -96,23 +96,35 @@ export default function MoviesPage() {
   }, [searchParams, isInitialized])
   // Fetch movies from backend when filters/sort change
   useEffect(() => {
-    const apiBase = getApiUrl()
-    if (!apiBase) return
+    const apiBase = getApiUrl() || 'http://localhost:8000'
+    console.log('🔗 API Base URL:', apiBase)
     setIsLoading(true)
 
     const fetchMoviesData = async () => {
       try {
+        // If there's a search query, use the search endpoint
+        if (debouncedSearchQuery) {
+          const searchRes = await fetch(`${apiBase}/api/v1/movies/search?q=${encodeURIComponent(debouncedSearchQuery)}&limit=100`)
+          if (!searchRes.ok) throw new Error('Failed to search movies')
+          const searchData = await searchRes.json()
+          setBaseMovies(Array.isArray(searchData.results) ? searchData.results : [])
+          setIsLoading(false)
+          return
+        }
+
+        // Otherwise, use the regular list endpoint with filters
         const params: any = {
           page: 1,
-          limit: 50
+          limit: 100  // Increased from 50 to show more results
         }
 
         if (filters.genres.length) params.genre = filters.genres[0]
-        if (filters.yearRange[0]) params.yearMin = filters.yearRange[0]
-        if (filters.yearRange[1]) params.yearMax = filters.yearRange[1]
+        if (filters.yearRange[0] > 1900) params.yearMin = filters.yearRange[0]
+        if (filters.yearRange[1] < new Date().getFullYear()) params.yearMax = filters.yearRange[1]
         if (sortBy) params.sortBy = sortBy
 
         const data = await getMovies(params)
+        console.log('🎬 Fetched movies from backend:', data?.length || 0, 'movies')
         setBaseMovies(Array.isArray(data) ? data : [])
       } catch (error) {
         console.error('Failed to fetch movies:', error)
@@ -123,7 +135,7 @@ export default function MoviesPage() {
     }
 
     fetchMoviesData()
-  }, [filters, sortBy])
+  }, [filters, sortBy, debouncedSearchQuery])
 
 
   // Update URL when filters change - only after initialization
@@ -160,44 +172,29 @@ export default function MoviesPage() {
   // Filter and sort movies
   const filteredMovies = useMemo(() => {
     let filtered = [...baseMovies]
+    console.log('📊 Base movies before client filters:', filtered.length)
 
-    // Apply search
-    if (debouncedSearchQuery) {
-      filtered = filtered.filter(
-        (movie) =>
-          movie.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-          movie.director?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-          movie.cast?.some((actor) => actor.toLowerCase().includes(debouncedSearchQuery.toLowerCase())),
-      )
-    }
+    // Search is now handled server-side
+    // Genre, country, language, status filters are handled server-side
+    // Only apply score and year filters client-side
 
-    // Apply filters
-    if (filters.genres.length) {
-      filtered = filtered.filter((movie) => movie.genres?.some((genre) => filters.genres.includes(genre)))
-    }
-
-    if (filters.countries.length) {
-      filtered = filtered.filter((movie) => filters.countries.includes(movie.country || ""))
-    }
-
-    if (filters.languages.length) {
-      filtered = filtered.filter((movie) => filters.languages.includes(movie.language || ""))
-    }
-
-    if (filters.status.length) {
-      filtered = filtered.filter((movie) => filters.status.includes(movie.status || ""))
-    }
-
-    // Apply score filter
+    // Apply score filter (backend doesn't support this yet)
     filtered = filtered.filter(
       (movie) => (movie.sidduScore || 0) >= filters.scoreRange[0] && (movie.sidduScore || 0) <= filters.scoreRange[1],
     )
 
-    // Apply year filter
+    // Apply year filter (backend doesn't support this yet)
+    const startYear = filters.yearRange[0]
+    const endYear = filters.yearRange[1]
+
     filtered = filtered.filter((movie) => {
-      const year = movie.year ? Number.parseInt(movie.year) : 0
-      return year >= filters.yearRange[0] && year <= filters.yearRange[1]
+      if (!movie.releaseDate) return true
+      const year = new Date(movie.releaseDate).getFullYear()
+      return year >= startYear && year <= endYear
     })
+
+    console.log('📊 Movies after client filters:', filtered.length)
+    console.log('📊 Score range:', filters.scoreRange, 'Year range:', filters.yearRange)
 
     // Sort
     switch (sortBy) {
@@ -223,7 +220,12 @@ export default function MoviesPage() {
     }
 
     return filtered
-  }, [baseMovies, debouncedSearchQuery, filters, sortBy])
+  }, [baseMovies, filters, sortBy])
+
+  // Debug: Log final render count
+  useEffect(() => {
+    console.log('🎯 Rendering movies count:', filteredMovies.length)
+  }, [filteredMovies])
 
   // Handle view mode change
   const handleViewModeChange = (mode: ViewMode) => {

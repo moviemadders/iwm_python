@@ -49,7 +49,7 @@ async def list_movies(
 @router.get("/search")
 async def search_movies(
     q: str = Query(..., min_length=1, description="Search query"),
-    limit: int = Query(10, ge=1, le=50, description="Maximum number of results"),
+    limit: int = Query(10, ge=1, le=200, description="Maximum number of results"),
     session: AsyncSession = Depends(get_session),
 ) -> Any:
     """

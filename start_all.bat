@@ -6,6 +6,10 @@ echo   Movie Madders Development Starter
 echo ==========================================
 
 echo.
+echo Clearing ports 3000 and 8000...
+call clear_ports.bat
+
+echo.
 echo [1/2] Starting Backend Server...
 if exist "backend\start.bat" (
     start "Movie Madders Backend" cmd /k "cd backend && start.bat"
