@@ -31,10 +31,11 @@ class Settings(BaseSettings):
     gemini_api_key: Union[str, None] = Field(default=None)
     gemini_model: str = Field(default="gemini-2.5-flash")
 
-    # Cloudinary
-    cloudinary_cloud_name: Union[str, None] = Field(default=None)
-    cloudinary_api_key: Union[str, None] = Field(default=None)
-    cloudinary_api_secret: Union[str, None] = Field(default=None)
+    # AWS S3
+    aws_access_key_id: Union[str, None] = Field(default=None)
+    aws_secret_access_key: Union[str, None] = Field(default=None)
+    aws_region: str = Field(default="us-east-1")
+    s3_bucket_name: Union[str, None] = Field(default=None)
 
     # Pydantic v2: load .env from backend app folder regardless of cwd
     model_config = SettingsConfigDict(

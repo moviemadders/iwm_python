@@ -58,10 +58,21 @@ export default function MovieManagementPage() {
   })
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: "releaseDate", direction: "desc" })
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize] = useState(10) // For table view, grid might show more or adapt
+  const [pageSize] = useState(20) // Fetch 20 per page from server
   const [selectedMovieIds, setSelectedMovieIds] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [totalMovies, setTotalMovies] = useState(0) // Total count from server
   const { toast } = useToast()
+  
+  // Debounce search to avoid excessive API calls
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+      setCurrentPage(1) // Reset to page 1 when search changes
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   // Modals State
   const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false)
@@ -82,12 +93,91 @@ export default function MovieManagementPage() {
   } | null>(null)
 
   useEffect(() => {
-    // Fetch movies from backend API
+    // Fetch movies from backend API with server-side pagination, search, and filters
     const fetchMovies = async () => {
       setIsLoading(true)
       try {
         const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "https://iwm-python.onrender.com"
-        const res = await fetch(`${apiBase}/api/v1/movies`)
+        
+        // Build query parameters for server-side filtering
+        const params = new URLSearchParams({
+          page: currentPage.toString(),
+          limit: pageSize.toString(),
+        })
+        
+        // Add search query if present
+        if (debouncedSearch) {
+          // Use the search endpoint for text queries
+          const searchRes = await fetch(`${apiBase}/api/v1/movies/search?q=${encodeURIComponent(debouncedSearch)}&limit=${pageSize}`)
+          if (!searchRes.ok) throw new Error("Failed to search movies")
+          const searchData = await searchRes.json()
+          const results = searchData.results || []
+          
+          // Map results
+          const mappedMovies = results.map((m: any) => ({
+            id: m.id,
+            title: m.title,
+            originalTitle: m.title,
+            poster: m.posterUrl || "/abstract-movie-poster.png",
+            backdrop: m.backdropUrl || "/movie-backdrop.png",
+            sidduScore: m.sidduScore || 0,
+            releaseDate: m.releaseDate ? m.releaseDate.split("T")[0] : new Date().toISOString().split("T")[0],
+            status: (m.status || "draft").toLowerCase() as MovieStatus,
+            genres: m.genres || [],
+            synopsis: m.synopsis || m.overview || "",
+            runtime: m.runtime || 120,
+            languages: [m.language || "English"],
+            certification: m.rating || "Unrated",
+            cast: m.cast || [],
+            crew: m.directors || [],
+            galleryImages: [],
+            trailerUrl: "",
+            trailerEmbed: "",
+            streamingLinks: [],
+            releaseDates: [{ region: "US", date: m.releaseDate ? m.releaseDate.split("T")[0] : "", type: "Theatrical" }],
+            awards: [],
+            isPublished: m.status === "released",
+            isArchived: false,
+            importedFrom: "backend",
+            budget: m.budget,
+            boxOffice: m.revenue,
+            productionCompanies: [],
+            countriesOfOrigin: [m.country || ""],
+            tagline: m.tagline || "",
+            keywords: [],
+            aspectRatio: "",
+            soundMix: [],
+            camera: "",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }))
+          
+          setMovies(mappedMovies)
+          setTotalMovies(searchData.total || results.length)
+          setIsLoading(false)
+          return
+        }
+        
+        // Add filters
+        if (filters.genre && filters.genre !== "all") {
+          params.set("genre", filters.genre)
+        }
+        if (filters.status && filters.status !== "all") {
+          params.set("status", filters.status)
+        }
+        if (filters.year && filters.year !== "all") {
+          const year = parseInt(filters.year as string)
+          params.set("yearMin", year.toString())
+          params.set("yearMax", year.toString())
+        }
+        
+        // Add sorting
+        if (sortConfig) {
+          const sortField = sortConfig.key === "releaseDate" ? "year" : sortConfig.key
+          params.set("sortBy", `${sortField}:${sortConfig.direction}`)
+        }
+        
+        const res = await fetch(`${apiBase}/api/v1/movies?${params.toString()}`)
         if (!res.ok) throw new Error("Failed to fetch movies")
         const data = await res.json()
 
@@ -138,18 +228,20 @@ export default function MovieManagementPage() {
         }))
 
         setMovies(mappedMovies)
+        // For now, estimate total - ideally backend should return total count
+        setTotalMovies(mappedMovies.length < pageSize ? (currentPage - 1) * pageSize + mappedMovies.length : currentPage * pageSize + 1)
       } catch (error) {
         console.error("Error fetching movies:", error)
         toast({ variant: "destructive", title: "Error", description: "Failed to fetch movies from backend" })
-        // Fallback to mock data
-        setMovies(mockMoviesData)
+        setMovies([])
+        setTotalMovies(0)
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchMovies()
-  }, [])
+  }, [currentPage, pageSize, debouncedSearch, filters, sortConfig])
 
   const handleSelectMovie = useCallback((movieId: string, checked: boolean) => {
     setSelectedMovieIds((prevSelected) =>
@@ -157,58 +249,10 @@ export default function MovieManagementPage() {
     )
   }, [])
 
-  const filteredMovies = useMemo(() => {
-    let tempFiltered = [...movies]
-
-    if (searchQuery) {
-      tempFiltered = tempFiltered.filter((movie) => movie.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    }
-
-    if (filters.genre && filters.genre !== "all") {
-      tempFiltered = tempFiltered.filter((movie) => movie.genres.includes(filters.genre as MovieGenre))
-    }
-    if (filters.status && filters.status !== "all") {
-      tempFiltered = tempFiltered.filter((movie) => movie.status === filters.status)
-    }
-    if (filters.year && filters.year !== "all") {
-      tempFiltered = tempFiltered.filter(
-        (movie) => movie.releaseDate && movie.releaseDate.startsWith(filters.year as string),
-      )
-    }
-    return tempFiltered
-  }, [movies, searchQuery, filters])
-
-  const sortedMovies = useMemo(() => {
-    if (!sortConfig) return filteredMovies
-
-    const { key, direction } = sortConfig
-
-    return [...filteredMovies].sort((a, b) => {
-      let aValue = a[key]
-      let bValue = b[key]
-
-      if (key === "sidduScore" || key === "runtime" || key === "budget" || key === "boxOffice") {
-        aValue = Number(aValue) || 0
-        bValue = Number(bValue) || 0
-      }
-
-      if (aValue === bValue) return 0
-      if (aValue === undefined || aValue === null) return 1
-      if (bValue === undefined || bValue === null) return -1
-
-      if (aValue < bValue) return direction === "asc" ? -1 : 1
-      if (aValue > bValue) return direction === "asc" ? 1 : -1
-      return 0
-    })
-  }, [filteredMovies, sortConfig])
-
-  const totalItems = filteredMovies.length
-  const totalPages = Math.ceil(totalItems / pageSize)
-
-  const paginatedMovies = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize
-    return sortedMovies.slice(startIndex, startIndex + pageSize)
-  }, [sortedMovies, currentPage, pageSize])
+  // Server-side filtering/sorting - movies are already filtered
+  // Just use them directly
+  const paginatedMovies = movies
+  const totalPages = Math.ceil(totalMovies / pageSize)
 
   const handleSort = useCallback((key: keyof Movie) => {
     setSortConfig((prevConfig) => {
@@ -855,7 +899,7 @@ export default function MovieManagementPage() {
           totalPages={totalPages}
           onPageChange={setCurrentPage}
           itemsPerPage={pageSize}
-          totalItems={totalItems}
+          totalItems={totalMovies}
         />
       )}
 

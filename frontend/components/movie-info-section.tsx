@@ -3,10 +3,12 @@
 import { useRef } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { motion } from "framer-motion"
-import { ChevronRight } from "lucide-react"
+import { motion, useInView } from "framer-motion"
+import { ChevronRight, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { useHaptic } from "@/hooks/use-haptic"
+import { cn } from "@/lib/utils"
 
 interface Person {
   id: string
@@ -31,6 +33,9 @@ interface MovieInfoSectionProps {
 
 export function MovieInfoSection({ movie }: MovieInfoSectionProps) {
   const carouselRef = useRef<HTMLDivElement>(null)
+  const { trigger } = useHaptic()
+  const ref = useRef(null)
+  const isInView = useInView(ref, { once: true, margin: "-100px" })
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -45,86 +50,78 @@ export function MovieInfoSection({ movie }: MovieInfoSectionProps) {
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-  }
-
-  const tagVariants = {
-    hidden: { opacity: 0, scale: 0.95 },
-    visible: { opacity: 1, scale: 1, transition: { duration: 0.3 } },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      transition: { 
+        type: "spring",
+        stiffness: 100,
+        damping: 20
+      } 
+    },
   }
 
   return (
     <motion.section
-      className="w-full max-w-7xl mx-auto px-4 py-8 md:py-12"
+      ref={ref}
+      className="w-full max-w-7xl mx-auto px-4 py-12 md:py-16 relative z-10"
       initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, margin: "-100px" }}
+      animate={isInView ? "visible" : "hidden"}
       variants={containerVariants}
     >
-      {/* Section Title */}
-      <motion.h2 className="text-2xl md:text-3xl font-bold font-inter text-[#E0E0E0] mb-6" variants={itemVariants}>
-        About the Movie
-      </motion.h2>
-
-      {/* Details List */}
-      <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6" variants={itemVariants}>
-        {/* Directors */}
-        <div className="flex flex-col space-y-1">
-          <span className="text-[#A0A0A0] font-dmsans text-sm">
-            {movie.directors.length > 1 ? "Directors" : "Director"}
-          </span>
-          <div className="text-[#E0E0E0] font-dmsans">
-            {movie.directors.map((director, index) => (
-              <span key={director.id}>
-                <Link href={`/person/${director.id}`} className="hover:text-[#00BFFF] transition-colors">
-                  {director.name}
-                </Link>
-                {index < movie.directors.length - 1 ? ", " : ""}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Writers */}
-        <div className="flex flex-col space-y-1">
-          <span className="text-[#A0A0A0] font-dmsans text-sm">{movie.writers.length > 1 ? "Writers" : "Writer"}</span>
-          <div className="text-[#E0E0E0] font-dmsans">
-            {movie.writers.map((writer, index) => (
-              <span key={writer.id}>
-                <Link href={`/person/${writer.id}`} className="hover:text-[#00BFFF] transition-colors">
-                  {writer.name}
-                </Link>
-                {index < movie.writers.length - 1 ? ", " : ""}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Producers */}
-        <div className="flex flex-col space-y-1">
-          <span className="text-[#A0A0A0] font-dmsans text-sm">
-            {movie.producers.length > 1 ? "Producers" : "Producer"}
-          </span>
-          <div className="text-[#E0E0E0] font-dmsans">
-            {movie.producers.map((producer, index) => (
-              <span key={producer.id}>
-                <Link href={`/person/${producer.id}`} className="hover:text-[#00BFFF] transition-colors">
-                  {producer.name}
-                </Link>
-                {index < movie.producers.length - 1 ? ", " : ""}
-              </span>
-            ))}
-          </div>
-        </div>
+      {/* Section Title with Neon Accent */}
+      <motion.div className="flex items-center gap-4 mb-8" variants={itemVariants}>
+        <div className="h-8 w-1 bg-[var(--primary)] rounded-full shadow-[0_0_10px_var(--primary)]" />
+        <h2 className="text-2xl md:text-3xl font-bold font-inter text-white tracking-tight">
+          Behind the Scenes
+        </h2>
       </motion.div>
 
-      {/* Genre Tags */}
-      <motion.div className="flex flex-wrap gap-2 mb-8" variants={itemVariants} custom={1}>
+      {/* Details Grid - Glass Cards */}
+      <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-12" variants={itemVariants}>
+        {[
+          { title: "Directors", people: movie.directors },
+          { title: "Writers", people: movie.writers },
+          { title: "Producers", people: movie.producers }
+        ].map((group, idx) => (
+          <motion.div 
+            key={group.title}
+            className="glass-panel p-6 rounded-xl hover:bg-white/10 transition-colors duration-300"
+            whileHover={{ scale: 1.02 }}
+            transition={{ type: "spring", stiffness: 300 }}
+          >
+            <span className="text-[var(--primary)] font-dmsans text-sm uppercase tracking-wider font-semibold mb-2 block">
+              {group.title}
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {group.people.map((person, index) => (
+                <span key={person.id} className="text-gray-300 font-dmsans text-lg">
+                  <Link 
+                    href={`/person/${person.id}`} 
+                    className="hover:text-white hover:underline decoration-[var(--primary)] underline-offset-4 transition-all"
+                    onClick={() => trigger("light")}
+                  >
+                    {person.name}
+                  </Link>
+                  {index < group.people.length - 1 && <span className="text-gray-600 mr-2">,</span>}
+                </span>
+              ))}
+            </div>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* Genre Tags - Neon Pills */}
+      <motion.div className="flex flex-wrap gap-3 mb-16" variants={itemVariants}>
         {movie.genres.map((genre) => (
-          <motion.div key={genre} variants={tagVariants}>
-            <Link href={`/movies/genre/${genre.toLowerCase()}`}>
+          <motion.div 
+            key={genre} 
+            whileHover={{ scale: 1.05, y: -2 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Link href={`/movies/genre/${genre.toLowerCase()}`} onClick={() => trigger("light")}>
               <Badge
-                className="bg-transparent border border-[#00BFFF] text-[#E0E0E0] hover:bg-[#00BFFF]/10 transition-colors font-dmsans cursor-pointer"
+                className="bg-transparent border border-white/20 text-gray-300 hover:text-[var(--primary)] hover:border-[var(--primary)] hover:bg-[var(--primary)]/10 transition-all duration-300 px-4 py-2 text-sm font-medium cursor-pointer rounded-full"
                 variant="outline"
               >
                 {genre}
@@ -135,80 +132,82 @@ export function MovieInfoSection({ movie }: MovieInfoSectionProps) {
       </motion.div>
 
       {/* Cast Section */}
-      <motion.div variants={itemVariants} custom={2}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold font-inter text-[#E0E0E0]">Cast</h3>
+      <motion.div variants={itemVariants} className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="h-8 w-1 bg-[var(--secondary)] rounded-full shadow-[0_0_10px_var(--secondary)]" />
+            <h3 className="text-2xl font-bold font-inter text-white">Top Cast</h3>
+          </div>
+          
+          <Button
+            variant="ghost"
+            className="text-[var(--primary)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/10 font-inter group"
+            asChild
+            onClick={() => trigger("light")}
+          >
+            <Link href="#">
+              See All
+              <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+          </Button>
         </div>
 
-        {/* Cast Carousel */}
-        <div className="relative">
+        {/* Cast Carousel with Snap Scroll */}
+        <div className="relative -mx-4 px-4 md:mx-0 md:px-0">
           <div
             ref={carouselRef}
-            className="flex overflow-x-auto pb-4 space-x-4 scrollbar-hide snap-x snap-mandatory"
+            className="flex overflow-x-auto pb-8 space-x-4 scrollbar-hide snap-x snap-mandatory pt-4"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             {movie.cast.map((actor, index) => (
               <motion.div
                 key={actor.id}
-                className="flex-shrink-0 w-[140px] md:w-[160px] snap-start"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                className="flex-shrink-0 w-[160px] md:w-[180px] snap-start"
+                initial={{ opacity: 0, scale: 0.8 }}
+                whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
+                transition={{ duration: 0.4, delay: index * 0.05, type: "spring" }}
               >
-                <motion.div
-                  className="bg-[#282828] rounded-lg shadow-md overflow-hidden"
-                  whileHover={{ scale: 1.02 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  <Link href={`/person/${actor.id}`}>
-                    <div className="flex flex-col items-center p-4">
-                      <div className="w-20 h-20 rounded-full overflow-hidden mb-3 bg-[#3A3A3A]">
-                        {actor.profileUrl ? (
-                          <Image
-                            src={actor.profileUrl || "/placeholder.svg"}
-                            alt={actor.name}
-                            width={80}
-                            height={80}
-                            className="object-cover w-full h-full"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-[#3A3A3A] text-[#A0A0A0]">
-                            <span className="text-2xl">{actor.name.charAt(0)}</span>
-                          </div>
-                        )}
-                      </div>
-                      <h4 className="font-inter font-medium text-[#E0E0E0] text-center line-clamp-1">{actor.name}</h4>
-                      <p className="text-[#A0A0A0] text-sm font-dmsans text-center line-clamp-1 mt-1">
+                <Link href={`/person/${actor.id}`} onClick={() => trigger("light")}>
+                  <motion.div
+                    className="group relative bg-[#111] rounded-2xl overflow-hidden border border-white/5 hover:border-[var(--primary)]/50 transition-colors duration-300"
+                    whileHover={{ y: -10 }}
+                  >
+                    {/* Image Container */}
+                    <div className="aspect-[3/4] overflow-hidden relative">
+                      {actor.profileUrl ? (
+                        <Image
+                          src={actor.profileUrl || "/placeholder.svg"}
+                          alt={actor.name}
+                          fill
+                          className="object-cover transition-transform duration-500 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a] text-gray-600">
+                          <User size={48} />
+                        </div>
+                      )}
+                      {/* Gradient Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+                    </div>
+
+                    {/* Text Content */}
+                    <div className="p-4 relative">
+                      <h4 className="font-inter font-bold text-white text-lg leading-tight group-hover:text-[var(--primary)] transition-colors line-clamp-1">
+                        {actor.name}
+                      </h4>
+                      <p className="text-gray-400 text-sm font-dmsans mt-1 line-clamp-1">
                         {actor.character}
                       </p>
                     </div>
-                  </Link>
-                </motion.div>
+                  </motion.div>
+                </Link>
               </motion.div>
             ))}
           </div>
-
-          {/* Scroll Indicators */}
-          <div className="absolute left-0 right-0 bottom-0 h-1 bg-[#282828] rounded-full overflow-hidden">
-            <div className="h-full bg-[#00BFFF]/30 w-1/3 rounded-full"></div>
-          </div>
-        </div>
-
-        {/* See All Button */}
-        <div className="flex justify-center md:justify-end mt-6">
-          <motion.div whileTap={{ scale: 0.98 }} transition={{ duration: 0.15 }}>
-            <Button
-              variant="ghost"
-              className="text-[#00BFFF] hover:text-[#00BFFF] hover:bg-[#00BFFF]/10 font-inter"
-              asChild
-            >
-              <Link href="/movies/inception/cast-crew">
-                See All Cast & Crew
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Link>
-            </Button>
-          </motion.div>
+          
+          {/* Fade edges for scroll indication */}
+          <div className="absolute top-0 right-0 bottom-8 w-24 bg-gradient-to-l from-black to-transparent pointer-events-none md:hidden" />
         </div>
       </motion.div>
     </motion.section>

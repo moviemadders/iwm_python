@@ -1,0 +1,17 @@
+﻿Logging in as admin...
+Login successful.
+Preparing payload...
+Importing movie with ID: manual-rrr-1764259668096...
+Import status: 200
+Import result: {
+  "imported": 0,
+  "updated": 0,
+  "failed": 1,
+  "errors": [
+    "manual-rrr-1764259668096: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.DataError'>: invalid input for query argument $18: 5500000000 (value out of int32 range)\n[SQL: INSERT INTO movies (external_id, tmdb_id, title, tagline, year, release_date, runtime, siddu_score, critics_score, imdb_rating, rotten_tomatoes_score, rating, language, country, overview, poster_url, backdrop_url, budget, revenue, video_url, video_source, is_free, status, trivia_status, timeline_status, awards_status, cast_crew_status, media_status, streaming_status, basic_info_status, curation_status, quality_score, curator_notes, curated_by_id, curated_at, last_reviewed_at) VALUES ($1::VARCHAR, $2::INTEGER, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::TIMESTAMP WITHOUT TIME ZONE, $7::INTEGER, $8::FLOAT, $9::FLOAT, $10::FLOAT, $11::INTEGER, $12::VARCHAR, $13::VARCHAR, $14::VARCHAR, $15::VARCHAR, $16::VARCHAR, $17::VARCHAR, $18::INTEGER, $19::INTEGER, $20::VARCHAR, $21::VARCHAR, $22::BOOLEAN, $23::VARCHAR, $24::VARCHAR, $25::VARCHAR, $26::VARCHAR, $27::VARCHAR, $28::VARCHAR, $29::VARCHAR, $30::VARCHAR, $31::VARCHAR, $32::INTEGER, $33::VARCHAR, $34::INTEGER, $35::TIMESTAMP WITHOUT TIME ZONE, $36::TIMESTAMP WITHOUT TIME ZONE) RETURNING movies.id]\n[parameters: ('manual-rrr-1764259668096', None, 'RRR', 'Rise. Roar. Revolt.', '2022', datetime.datetime(2022, 3, 25, 0, 0), 182, 9.1, None, None, None, 'U/A', 'Telugu', 'India', 'Set in 1920s India under British colonial rule, two fierce revolutionaries \u2014 Komaram Bheem and Alluri Sitarama Raju \u2014 form an unlikely friendship whi ... (126 characters truncated) ...  to rescue a kidnapped tribal girl and battle the oppressive imperial regime, leading to an epic saga of brotherhood, betrayal, sacrifice and revolt.', 'https://image.tmdb.org/t/p/original/your_poster_path_here.jpg', 'https://image.tmdb.org/t/p/original/your_backdrop_path_here.jpg', 5500000000, 13000000000, None, None, False, 'released', 'draft', 'draft', 'draft', 'draft', 'draft', 'draft', 'draft', 'draft', None, None, None, None, None)]\n(Background on this error at: https://sqlalche.me/e/20/dbapi)"
+  ]
+}
+Verifying fetch for ID: manual-rrr-1764259668096...
+Fetch status: 404
+Failed to fetch movie.
+{"detail":"Movie not found"}

@@ -1,0 +1,9 @@
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    # No database dependency - using external RDS
+    # DATABASE_URL environment variable should point to RDS endpoint

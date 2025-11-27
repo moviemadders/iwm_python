@@ -16,7 +16,7 @@ import { ProfilePulses } from "@/components/profile/sections/profile-pulses"
 import { Loader2 } from "lucide-react"
 import { updateUserProfile } from "@/lib/api/profile"
 import { useToast } from "@/hooks/use-toast"
-import { getCurrentUser } from "@/lib/auth"
+import { getCurrentUser, getAccessToken } from "@/lib/auth"
 import { getApiUrl } from "@/lib/api-config"
 
 type ProfileSection = "overview" | "pulse" | "reviews" | "watchlist" | "favorites" | "collections" | "history" | "settings"
@@ -82,8 +82,17 @@ export default function UserProfilePage() {
       // Refresh the full profile data from server after avatar or banner upload
       if (data.avatarUrl || data.bannerUrl) {
         const apiBase = getApiUrl()
+        const token = getAccessToken()
+        const refreshHeaders: HeadersInit = {
+          "Content-Type": "application/json",
+        }
+        if (token) {
+          refreshHeaders["Authorization"] = `Bearer ${token}`
+        }
+        
         const response = await fetch(`${apiBase}/api/v1/users/${username}`, {
           cache: "no-store",
+          headers: refreshHeaders,
         })
         if (response.ok) {
           const freshData = await response.json()
@@ -124,9 +133,18 @@ export default function UserProfilePage() {
       try {
         const apiBase = getApiUrl()
 
-        // Fetch user profile from backend
+        // Fetch user profile from backend with auth header
+        const token = getAccessToken()
+        const headers: HeadersInit = {
+          "Content-Type": "application/json",
+        }
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`
+        }
+        
         const response = await fetch(`${apiBase}/api/v1/users/${username}`, {
           cache: "no-store",
+          headers,
         })
 
         if (!response.ok) {

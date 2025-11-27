@@ -805,20 +805,20 @@ export default function MovieDetailsPage({ params }: { params: Promise<{ id: str
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-[#1A1A1A] flex items-center justify-center">
-                <div className="w-16 h-16 border-4 border-[#282828] border-t-[#00BFFF] rounded-full animate-spin"></div>
+            <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+                <div className="w-16 h-16 border-4 border-white/10 border-t-[var(--primary)] rounded-full animate-spin shadow-[0_0_20px_var(--primary)]"></div>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen bg-[#1A1A1A]">
-            {/* Top Bar */}
-            <div className="fixed top-0 left-0 right-0 z-10 bg-[#1A1A1A]/80 backdrop-blur-sm">
+        <div className="min-h-screen bg-[#050505] text-white">
+            {/* Top Bar - Glassmorphism */}
+            <div className="fixed top-0 left-0 right-0 z-50 bg-[#050505]/80 backdrop-blur-md border-b border-white/5">
                 <div className="max-w-7xl mx-auto px-4 py-4 flex items-center">
-                    <Link href="/movies" className="text-[#E0E0E0] hover:text-[#00BFFF] transition-colors">
-                        <ArrowLeft className="h-6 w-6" />
-                        <span className="sr-only">Back</span>
+                    <Link href="/movies" className="text-gray-300 hover:text-[var(--primary)] transition-colors flex items-center gap-2 group">
+                        <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
+                        <span className="font-medium font-inter">Back to Browse</span>
                     </Link>
                 </div>
             </div>
@@ -865,7 +865,7 @@ export default function MovieDetailsPage({ params }: { params: Promise<{ id: str
             {/* Rest of the content would go here */}
             <div className="max-w-7xl mx-auto px-4 py-8">
                 {/* This is just a placeholder for the rest of the movie details page */}
-                <div className="h-[20vh] flex items-center justify-center text-[#A0A0A0] text-lg font-dmsans">
+                <div className="h-[20vh] flex items-center justify-center text-gray-500 text-lg font-dmsans">
                     Additional movie details would appear here
                 </div>
             </div>

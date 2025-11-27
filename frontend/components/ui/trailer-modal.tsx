@@ -37,14 +37,14 @@ export function TrailerModal({ isOpen, onClose, videoUrl, title }: TrailerModalP
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-[900px] p-0 bg-black border-[#282828] overflow-hidden aspect-video">
+            <DialogContent className="sm:max-w-[900px] p-0 bg-black border border-white/10 overflow-hidden aspect-video shadow-[0_0_50px_-10px_rgba(0,240,255,0.2)]">
                 <VisuallyHidden>
                     <DialogTitle>Trailer for {title}</DialogTitle>
                 </VisuallyHidden>
-                <div className="relative w-full h-full">
+                <div className="relative w-full h-full group">
                     <button
                         onClick={onClose}
-                        className="absolute top-4 right-4 z-50 p-2 bg-black/50 rounded-full text-white hover:bg-black/80 transition-colors"
+                        className="absolute top-4 right-4 z-50 p-2 bg-black/50 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-[var(--primary)] hover:text-black hover:border-[var(--primary)] transition-all duration-300 opacity-0 group-hover:opacity-100"
                     >
                         <X className="h-6 w-6" />
                         <span className="sr-only">Close</span>
@@ -59,8 +59,8 @@ export function TrailerModal({ isOpen, onClose, videoUrl, title }: TrailerModalP
                             allowFullScreen
                         />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[#A0A0A0]">
-                            <p>Trailer not available</p>
+                        <div className="w-full h-full flex items-center justify-center text-gray-500 bg-[#050505]">
+                            <p className="font-dmsans">Trailer not available</p>
                         </div>
                     )}
                 </div>

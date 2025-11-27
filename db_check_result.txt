@@ -1,0 +1,34 @@
+
+================================================================================
+Checking for streaming-related tables:
+================================================================================
+
+Tables found:
+  - movie_streaming_options
+  - streaming_platforms
+
+================================================================================
+Checking table structure for movie_streaming_options:
+================================================================================
+
+Columns:
+  - id: integer
+  - external_id: character varying
+  - movie_id: integer
+  - platform_id: integer
+  - region: character varying
+  - type: character varying
+  - price: character varying
+  - quality: character varying
+  - url: character varying
+  - verified: boolean
+
+================================================================================
+Checking if 'streaming_options' table exists:
+================================================================================
+
+  [OK] Table 'streaming_options' does NOT exist (this is expected)
+Traceback (most recent call last):
+  File "C:\Users\bilva_labs\Videos\movie madders\check_db_tables.py", line 83, in <module>
+    print("\nDone! Check db_check_result.txt for results.")
+ValueError: I/O operation on closed file.

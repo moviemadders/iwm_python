@@ -1,23 +1,16 @@
-"""
-File Upload Router
-Handles file uploads for user avatars, banners, and other media assets.
-"""
 
 from __future__ import annotations
 
-import os
 import uuid
 from pathlib import Path
 from typing import Any
 
-import cloudinary
-import cloudinary.uploader
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from pydantic import BaseModel
 
 from ..dependencies.auth import get_current_user
 from ..models import User
-from ..config import settings
+from ..services.s3_service import S3Service
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
@@ -30,13 +23,6 @@ ALLOWED_CONTENT_TYPES = {
     "image/webp",
     "image/gif",
 }
-
-# Configure Cloudinary
-cloudinary.config(
-    cloud_name=settings.cloudinary_cloud_name,
-    api_key=settings.cloudinary_api_key,
-    api_secret=settings.cloudinary_api_secret,
-)
 
 
 class UploadResponse(BaseModel):
@@ -71,26 +57,12 @@ async def upload_avatar(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
-    Upload user avatar image to Cloudinary.
-    
-    Requirements:
-    - Must be authenticated
-    - Image file (JPEG, PNG, WebP, GIF)
-    - Max file size: 5MB
-    
-    Returns:
-    - Cloudinary URL to access the uploaded avatar
-    - Public ID (filename)
-    - File size in bytes
+    Upload user avatar image to S3.
     """
-    # Validate file
     validate_image_file(file)
-
-    # Read file content
     content = await file.read()
     file_size = len(content)
 
-    # Check file size
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -98,27 +70,27 @@ async def upload_avatar(
         )
 
     try:
-        # Upload to Cloudinary
-        # We reset the file cursor to 0 before uploading because we read it above
-        await file.seek(0)
+        filename = f"avatars/avatar_{current_user.id}_{uuid.uuid4()}{Path(file.filename).suffix}"
         
-        result = cloudinary.uploader.upload(
+        # Use S3Service
+        url = await S3Service.upload_file(
             file.file,
-            folder="avatars",
-            public_id=f"avatar_{current_user.id}_{uuid.uuid4()}",
-            overwrite=True,
-            resource_type="image"
+            filename=filename,
+            content_type=file.content_type
         )
         
+        if not url:
+             raise Exception("Upload failed")
+
         return UploadResponse(
-            url=result.get("secure_url"),
-            filename=result.get("public_id"),
+            url=url,
+            filename=filename,
             size=file_size,
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload to Cloudinary: {str(e)}",
+            detail=f"Failed to upload to S3: {str(e)}",
         )
 
 
@@ -128,26 +100,12 @@ async def upload_banner(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
-    Upload user banner/cover image to Cloudinary.
-    
-    Requirements:
-    - Must be authenticated
-    - Image file (JPEG, PNG, WebP, GIF)
-    - Max file size: 5MB
-    
-    Returns:
-    - Cloudinary URL to access the uploaded banner
-    - Public ID (filename)
-    - File size in bytes
+    Upload user banner/cover image to S3.
     """
-    # Validate file
     validate_image_file(file)
-
-    # Read file content
     content = await file.read()
     file_size = len(content)
 
-    # Check file size
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -155,39 +113,35 @@ async def upload_banner(
         )
 
     try:
-        # Upload to Cloudinary
-        await file.seek(0)
+        filename = f"banners/banner_{current_user.id}_{uuid.uuid4()}{Path(file.filename).suffix}"
         
-        result = cloudinary.uploader.upload(
+        url = await S3Service.upload_file(
             file.file,
-            folder="banners",
-            public_id=f"banner_{current_user.id}_{uuid.uuid4()}",
-            overwrite=True,
-            resource_type="image"
+            filename=filename,
+            content_type=file.content_type
         )
         
+        if not url:
+             raise Exception("Upload failed")
+             
         return UploadResponse(
-            url=result.get("secure_url"),
-            filename=result.get("public_id"),
+            url=url,
+            filename=filename,
             size=file_size,
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload to Cloudinary: {str(e)}",
+            detail=f"Failed to upload to S3: {str(e)}",
         )
+
 @router.post("/media", response_model=UploadResponse)
 async def upload_media(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
-    Upload media file (image/video) to Cloudinary for Pulse posts.
-    
-    Requirements:
-    - Must be authenticated
-    - Image or Video file
-    - Max file size: 10MB
+    Upload media file (image/video) to S3 for Pulse posts.
     """
     # Validate file type (allow videos too)
     ALLOWED_MEDIA_TYPES = {
@@ -212,23 +166,26 @@ async def upload_media(
         )
 
     try:
-        await file.seek(0)
-        resource_type = "video" if file.content_type.startswith("video/") else "image"
+        # Determine folder based on type
+        folder = "pulse_videos" if file.content_type.startswith("video/") else "pulse_images"
+        filename = f"{folder}/media_{current_user.id}_{uuid.uuid4()}{Path(file.filename).suffix}"
         
-        result = cloudinary.uploader.upload(
+        url = await S3Service.upload_file(
             file.file,
-            folder="pulse_media",
-            public_id=f"media_{current_user.id}_{uuid.uuid4()}",
-            resource_type=resource_type
+            filename=filename,
+            content_type=file.content_type
         )
         
+        if not url:
+             raise Exception("Upload failed")
+
         return UploadResponse(
-            url=result.get("secure_url"),
-            filename=result.get("public_id"),
+            url=url,
+            filename=filename,
             size=file_size,
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload to Cloudinary: {str(e)}",
+            detail=f"Failed to upload to S3: {str(e)}",
         )

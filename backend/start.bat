@@ -49,5 +49,5 @@ echo Press Ctrl+C to stop the server
 echo.
 
 REM Start the server
-hypercorn src.main:app --bind 0.0.0.0:8000 --worker-class asyncio --reload
+hypercorn src.main:app --bind 0.0.0.0:8000 --workers 1 --worker-class asyncio --reload
 

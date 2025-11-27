@@ -213,7 +213,7 @@ async def get_new_releases(
                 detail="TMDB API key not configured",
             )
         
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             response = await client.get(
                 f"https://api.themoviedb.org/3/movie/{category}",
                 params={
@@ -224,9 +224,10 @@ async def get_new_releases(
             )
             
             if response.status_code != 200:
+                logger.error(f"TMDB API returned status {response.status_code}: {response.text}")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to fetch from TMDB API",
+                    detail=f"TMDB API error (HTTP {response.status_code})",
                 )
             
             data = response.json()
@@ -263,6 +264,20 @@ async def get_new_releases(
                 current_page=page,
             )
     
+    except httpx.ConnectError as e:
+        logger.error(f"Cannot connect to TMDB API: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Cannot connect to TMDB API. Please check your network connection or firewall settings.",
+        )
+    except httpx.TimeoutException as e:
+        logger.error(f"TMDB API timeout: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="TMDB API request timed out. Please try again.",
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching new releases: {str(e)}")
         raise HTTPException(
@@ -290,7 +305,7 @@ async def search_tmdb_movies(
                 detail="TMDB API key not configured",
             )
         
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             params = {
                 "api_key": settings.tmdb_api_key,
                 "query": query,

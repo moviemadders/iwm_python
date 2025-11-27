@@ -158,16 +158,16 @@ export function MoviePlayerModal({
             <DialogTitle className="sr-only">{title}</DialogTitle>
           
           {/* Header Overlay (fades out) */}
-          <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/80 to-transparent z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-             <h2 className="text-white text-xl font-semibold tracking-wide">{title}</h2>
+          <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/90 to-transparent z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+             <h2 className="text-white text-xl font-bold font-inter tracking-wide text-glow">{title}</h2>
           </div>
 
           <button 
             onClick={onClose}
-            className="absolute top-6 right-6 z-50 p-3 bg-black/40 hover:bg-white/20 rounded-full backdrop-blur-sm transition-all duration-300 group-hover:opacity-100 opacity-0"
+            className="absolute top-6 right-6 z-50 p-3 bg-black/40 hover:bg-[var(--primary)] hover:text-black rounded-full backdrop-blur-md border border-white/10 hover:border-[var(--primary)] transition-all duration-300 group-hover:opacity-100 opacity-0 shadow-lg"
             aria-label="Close player"
           >
-            <X className="w-8 h-8 text-white" />
+            <X className="w-8 h-8" />
           </button>
 
           <div className="w-full h-full">

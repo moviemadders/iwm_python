@@ -8,6 +8,8 @@ import { getUserCollections, addMovieToCollection, removeMovieFromCollection, cr
 import { useToast } from "@/hooks/use-toast"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { useHaptic } from "@/hooks/use-haptic"
+import { cn } from "@/lib/utils"
 
 interface AddToCollectionModalProps {
   movieId: string
@@ -30,6 +32,7 @@ export function AddToCollectionModal({
   const [newCollectionDescription, setNewCollectionDescription] = useState("")
   const [isCreating, setIsCreating] = useState(false)
   const { toast } = useToast()
+  const { trigger } = useHaptic()
 
   useEffect(() => {
     const loadCollections = async () => {
@@ -90,6 +93,7 @@ export function AddToCollectionModal({
   }, [movieId, toast])
 
   const toggleCollection = (collectionId: string) => {
+    trigger("light")
     setSelectedCollections(prev => {
       const newSet = new Set(prev)
       if (newSet.has(collectionId)) {
@@ -102,6 +106,7 @@ export function AddToCollectionModal({
   }
 
   const handleCreateCollection = async () => {
+    trigger("medium")
     if (!newCollectionName.trim()) {
       toast({
         title: "Validation Error",
@@ -152,7 +157,9 @@ export function AddToCollectionModal({
       setNewCollectionName("")
       setNewCollectionDescription("")
       setShowCreateForm(false)
+      trigger("success")
     } catch (error: any) {
+      trigger("error")
       console.error("Failed to create collection:", error)
       const errorMessage = error.message || "Failed to create collection. Please try again."
 
@@ -179,6 +186,7 @@ export function AddToCollectionModal({
 
   const handleSave = async () => {
     setIsSaving(true)
+    trigger("medium")
 
     try {
       // Determine which collections to add to and remove from
@@ -199,9 +207,11 @@ export function AddToCollectionModal({
         title: "Success",
         description: `${movieTitle} has been updated in your collections.`,
       })
+      trigger("success")
 
       onClose()
     } catch (error) {
+      trigger("error")
       console.error("Failed to update collections:", error)
       toast({
         title: "Error",
@@ -221,81 +231,88 @@ export function AddToCollectionModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
         onClick={onClose}
       />
 
       {/* Modal */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: 0.3 }}
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
         onClick={onClose}
       >
         <div
-          className="bg-[#282828] border border-[#3A3A3A] rounded-lg w-full max-w-md max-h-[80vh] flex flex-col"
+          className="glass-panel w-full max-w-md max-h-[80vh] flex flex-col rounded-2xl border border-white/10 shadow-[0_0_50px_-10px_rgba(0,240,255,0.1)]"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-[#3A3A3A]">
+          <div className="flex items-center justify-between p-6 border-b border-white/10">
             <div>
-              <h2 className="text-xl font-inter font-bold text-[#E0E0E0]">
+              <h2 className="text-xl font-inter font-bold text-white tracking-tight">
                 Add to Collection
               </h2>
-              <p className="text-sm text-[#A0A0A0] font-dm-sans mt-1">
+              <p className="text-sm text-gray-400 font-dmsans mt-1">
                 {movieTitle}
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-[#A0A0A0] hover:text-[#E0E0E0] hover:bg-[#3A3A3A] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#00BFFF]"
+              className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Collections List */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="w-8 h-8 border-4 border-[#00BFFF] border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-4 border-white/10 border-t-[var(--primary)] rounded-full animate-spin shadow-[0_0_15px_var(--primary)]" />
               </div>
             ) : (
               <div className="space-y-4">
                 {/* Create New Collection Button/Form */}
                 {!showCreateForm ? (
                   <button
-                    onClick={() => setShowCreateForm(true)}
-                    className="w-full flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-[#3A3A3A] hover:border-[#00BFFF]/50 text-[#A0A0A0] hover:text-[#00BFFF] transition-all"
+                    onClick={() => {
+                        setShowCreateForm(true)
+                        trigger("light")
+                    }}
+                    className="w-full flex items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-white/20 hover:border-[var(--primary)]/50 text-gray-400 hover:text-[var(--primary)] hover:bg-[var(--primary)]/5 transition-all group"
                   >
-                    <Plus className="w-5 h-5" />
-                    <span className="font-dm-sans font-medium">Create New Collection</span>
+                    <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
+                    <span className="font-dmsans font-medium">Create New Collection</span>
                   </button>
                 ) : (
-                  <div className="p-4 rounded-lg border-2 border-[#00BFFF] bg-[#00BFFF]/5 space-y-3">
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className="p-4 rounded-xl border border-[var(--primary)]/30 bg-[var(--primary)]/5 space-y-4"
+                  >
                     <div>
-                      <label className="block text-sm font-dm-sans text-[#E0E0E0] mb-1.5">
+                      <label className="block text-sm font-dmsans text-gray-300 mb-2">
                         Collection Name *
                       </label>
                       <Input
                         value={newCollectionName}
                         onChange={(e) => setNewCollectionName(e.target.value)}
                         placeholder="e.g., My Favorite Sci-Fi"
-                        className="bg-[#1A1A1A] border-[#3A3A3A] text-[#E0E0E0]"
+                        className="bg-black/50 border-white/10 text-white focus:border-[var(--primary)] focus:ring-[var(--primary)]/20"
                         disabled={isCreating}
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-dm-sans text-[#E0E0E0] mb-1.5">
+                      <label className="block text-sm font-dmsans text-gray-300 mb-2">
                         Description (Optional)
                       </label>
                       <Textarea
                         value={newCollectionDescription}
                         onChange={(e) => setNewCollectionDescription(e.target.value)}
                         placeholder="Describe your collection..."
-                        className="bg-[#1A1A1A] border-[#3A3A3A] text-[#E0E0E0] min-h-[80px]"
+                        className="bg-black/50 border-white/10 text-white min-h-[80px] focus:border-[var(--primary)] focus:ring-[var(--primary)]/20"
                         disabled={isCreating}
                       />
                     </div>
@@ -303,64 +320,71 @@ export function AddToCollectionModal({
                       <button
                         onClick={handleCreateCollection}
                         disabled={isCreating || !newCollectionName.trim()}
-                        className="flex-1 px-4 py-2 bg-[#00BFFF] text-white font-dm-sans font-medium rounded-lg hover:bg-[#00BFFF]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 px-4 py-2 bg-[var(--primary)] text-black font-bold font-inter rounded-lg hover:bg-[var(--primary)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_-5px_var(--primary)]"
                       >
-                        {isCreating ? "Creating..." : "Create & Add Movie"}
+                        {isCreating ? "Creating..." : "Create & Add"}
                       </button>
                       <button
                         onClick={() => {
                           setShowCreateForm(false)
                           setNewCollectionName("")
                           setNewCollectionDescription("")
+                          trigger("light")
                         }}
                         disabled={isCreating}
-                        className="px-4 py-2 border border-[#3A3A3A] text-[#E0E0E0] font-dm-sans font-medium rounded-lg hover:bg-[#3A3A3A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2 border border-white/10 text-gray-300 font-inter font-medium rounded-lg hover:bg-white/5 transition-colors"
                       >
                         Cancel
                       </button>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
 
                 {/* Existing Collections */}
                 {collections.length === 0 && !showCreateForm ? (
                   <div className="text-center py-8">
-                    <p className="text-[#A0A0A0] font-dm-sans">
+                    <p className="text-gray-500 font-dmsans">
                       You don't have any collections yet
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-2">
                     {collections.map(collection => (
-                      <button
+                      <motion.button
                         key={collection.id}
                         onClick={() => toggleCollection(collection.id)}
-                        className={`w-full flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
-                          selectedCollections.has(collection.id)
-                            ? "border-[#00BFFF] bg-[#00BFFF]/10"
-                            : "border-[#3A3A3A] hover:border-[#00BFFF]/50"
-                        }`}
+                        whileTap={{ scale: 0.98 }}
+                        className={cn(
+                            "w-full flex items-center justify-between p-4 rounded-xl border transition-all duration-300 group",
+                            selectedCollections.has(collection.id)
+                                ? "border-[var(--primary)] bg-[var(--primary)]/10 shadow-[0_0_15px_-5px_var(--primary)]"
+                                : "border-white/5 bg-white/5 hover:border-white/20 hover:bg-white/10"
+                        )}
                       >
                         <div className="flex-1 text-left">
-                          <h3 className="font-dm-sans font-medium text-[#E0E0E0]">
+                          <h3 className={cn(
+                              "font-dmsans font-medium transition-colors",
+                              selectedCollections.has(collection.id) ? "text-white" : "text-gray-300 group-hover:text-white"
+                          )}>
                             {collection.title}
                           </h3>
-                          <p className="text-sm text-[#A0A0A0] mt-0.5">
+                          <p className="text-sm text-gray-500 mt-0.5">
                             {collection.movieCount} {collection.movieCount === 1 ? "movie" : "movies"}
                           </p>
                         </div>
                         <div
-                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                            selectedCollections.has(collection.id)
-                              ? "border-[#00BFFF] bg-[#00BFFF]"
-                              : "border-[#3A3A3A]"
-                          }`}
+                          className={cn(
+                              "w-6 h-6 rounded-full border flex items-center justify-center transition-all duration-300",
+                              selectedCollections.has(collection.id)
+                                ? "border-[var(--primary)] bg-[var(--primary)] text-black"
+                                : "border-white/20 group-hover:border-white/40"
+                          )}
                         >
                           {selectedCollections.has(collection.id) && (
-                            <Check className="w-4 h-4 text-white" />
+                            <Check className="w-4 h-4" />
                           )}
                         </div>
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
                 )}
@@ -369,22 +393,22 @@ export function AddToCollectionModal({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-between p-6 border-t border-[#3A3A3A]">
-            <p className="text-sm text-[#A0A0A0] font-dm-sans">
+          <div className="flex items-center justify-between p-6 border-t border-white/10 bg-black/20">
+            <p className="text-sm text-gray-500 font-dmsans">
               {selectedCollections.size} {selectedCollections.size === 1 ? "collection" : "collections"} selected
             </p>
             <div className="flex items-center gap-3">
               <button
                 onClick={onClose}
                 disabled={isSaving}
-                className="px-6 py-2.5 border border-[#3A3A3A] text-[#E0E0E0] font-dm-sans font-medium rounded-lg hover:bg-[#3A3A3A] transition-colors focus:outline-none focus:ring-2 focus:ring-[#00BFFF] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2.5 border border-white/10 text-gray-300 font-inter font-medium rounded-xl hover:bg-white/5 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="px-6 py-2.5 bg-[#00BFFF] text-white font-dm-sans font-medium rounded-lg hover:bg-[#00BFFF]/90 transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#00BFFF] focus:ring-offset-2 focus:ring-offset-[#282828] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="px-6 py-2.5 bg-[var(--primary)] text-black font-bold font-inter rounded-xl hover:bg-[var(--primary)]/90 transition-all duration-200 hover:scale-105 shadow-[0_0_20px_-5px_var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {isSaving ? "Saving..." : "Save"}
               </button>
@@ -395,4 +419,3 @@ export function AddToCollectionModal({
     </>
   )
 }
-

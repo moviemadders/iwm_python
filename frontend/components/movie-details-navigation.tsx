@@ -3,6 +3,8 @@ import { motion } from "framer-motion"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Info, Star, Users, Clock, Film, Lightbulb, Trophy } from "lucide-react"
+import { useHaptic } from "@/hooks/use-haptic"
+import { cn } from "@/lib/utils"
 
 interface MovieDetailsNavigationProps {
   movieId: string
@@ -11,6 +13,7 @@ interface MovieDetailsNavigationProps {
 
 export function MovieDetailsNavigation({ movieId, movieTitle }: MovieDetailsNavigationProps) {
   const pathname = usePathname()
+  const { trigger } = useHaptic()
 
   const tabs = [
     {
@@ -71,29 +74,42 @@ export function MovieDetailsNavigation({ movieId, movieTitle }: MovieDetailsNavi
   const activeTab = getActiveTab()
 
   return (
-    <div className="bg-[#1A1A1A] border-b border-[#282828] sticky top-14 md:top-16 z-10">
-      <div className="max-w-7xl mx-auto px-2 md:px-4">
-        <nav className="flex overflow-x-auto scrollbar-hide snap-x snap-mandatory">
-          {tabs.map((tab) => (
-            <Link
-              key={tab.id}
-              href={tab.href}
-              className={`relative flex items-center gap-1.5 px-3 md:px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors snap-start ${
-                activeTab === tab.id ? "text-[#00BFFF]" : "text-[#A0A0A0] hover:text-[#E0E0E0]"
-              }`}
-            >
-              <span className="flex-shrink-0">{tab.icon}</span>
-              <span className="hidden sm:inline">{tab.label}</span>
-              {activeTab === tab.id && (
-                <motion.div
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#00BFFF]"
-                  layoutId="activeTabIndicator"
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                />
-              )}
-            </Link>
-          ))}
-        </nav>
+    <div className="sticky top-14 md:top-16 z-40 w-full">
+      {/* Glassmorphism Container */}
+      <div className="bg-[#050505]/80 backdrop-blur-xl border-b border-white/5 shadow-lg">
+        <div className="max-w-7xl mx-auto px-2 md:px-4">
+          <nav className="flex overflow-x-auto scrollbar-hide snap-x snap-mandatory py-2">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id
+              return (
+                <Link
+                  key={tab.id}
+                  href={tab.href}
+                  onClick={() => trigger("light")}
+                  className={cn(
+                    "relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium whitespace-nowrap transition-all duration-300 snap-start rounded-full mx-1",
+                    isActive 
+                      ? "text-[var(--primary)] bg-[var(--primary)]/10" 
+                      : "text-gray-400 hover:text-white hover:bg-white/5"
+                  )}
+                >
+                  <span className={cn("flex-shrink-0 transition-colors", isActive ? "text-[var(--primary)]" : "text-gray-500 group-hover:text-white")}>
+                    {tab.icon}
+                  </span>
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  
+                  {isActive && (
+                    <motion.div
+                      className="absolute inset-0 rounded-full border border-[var(--primary)]/30"
+                      layoutId="activeTabBorder"
+                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    />
+                  )}
+                </Link>
+              )
+            })}
+          </nav>
+        </div>
       </div>
     </div>
   )
